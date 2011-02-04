@@ -1,19 +1,10 @@
 #ifndef PHOTO_ARCHIVE_QT_H
 #define PHOTO_ARCHIVE_QT_H
 
-#include <map>
-#include <vector>
-
 #include <QDialog>
-#include <QBoxLayout>
-#include <QCheckBox>
 #include <QLineEdit>
-#include <QPushButton>
-#include <QRadioButton>
-#include <QTextEdit>
 #include <QFileInfo>
-#include <QCloseEvent>
-#include <QLabel>
+#include <QListWidget>
 
 #define PHOTO_ARCHIVE_QT_VER "0"
 
@@ -23,14 +14,20 @@ class PhotoArchiveWnd : public QDialog
 
 public:
 
+    PhotoArchiveWnd( QWidget *parent = 0, char *name = 0 );
+
 protected:
 
   
 protected slots:
 
+    void searchArchByName();
 
 private:
 
+    QLineEdit *mpSubstringEdit;
+
+    QListWidget *mpList;
 };
 
 
