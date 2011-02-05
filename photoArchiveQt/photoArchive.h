@@ -9,12 +9,33 @@
 class PhotoArchive
 {
 public:
-    PhotoArchive(const char *pArchDir);
+    PhotoArchive(QString aArchDir);
 
+    bool isOk() const
+    {
+        return mScanOk;
+    }
+
+    unsigned short getArchPrefixLen() const
+    {
+        return mArchivePath.length();
+    }
+    
     std::vector<QFileInfo> getFilesContainingStr(const QString &rSubStr) const;
+
+    static bool isImageFilename(const QFileInfo& file);
+
+    static bool isMetadataFilename(const QFileInfo& file);
+
+    bool findImagesRec(QString dirName, const std::vector<QString> &excludeList,
+                       std::vector<QFileInfo> &result);
 
 private:
 
+    bool mScanOk;
+
+    QString mArchivePath;
+    
     std::vector<QFileInfo> mFileList;
 };
 

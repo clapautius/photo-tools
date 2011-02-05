@@ -5,8 +5,9 @@
 #include <QLineEdit>
 #include <QFileInfo>
 #include <QListWidget>
+#include <QPushButton>
+#include <QLabel>
 
-#define PHOTO_ARCHIVE_QT_VER "0"
 
 class PhotoArchiveWnd : public QDialog
 {
@@ -25,9 +26,25 @@ protected slots:
 
 private:
 
+    void disableUserInteraction();
+
+    void enableUserInteraction();
+
+    static QPixmap generatePreview(const QFileInfo &rFile);
+
+    static bool uncompressToTmp(const QString &filePath, QString &tmpFileName);
+
+    void writeToStatusBar(const QString text="");
+
+    void updateDisplay();
+
+    QPushButton *mpSearchButton;
+    
     QLineEdit *mpSubstringEdit;
 
     QListWidget *mpList;
+
+    QLabel *mpStatusBar;
 };
 
 
