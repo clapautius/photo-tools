@@ -4,7 +4,7 @@
 #include <QApplication>
 #include <QString>
 
-#define PHOTO_ARCHIVE_QT_VER "1.1" // :release:
+#define PHOTO_ARCHIVE_QT_VER "1.2" // :release:
 
 #define DEFAULT_ARCHIVE_PATH "/home/me/Pictures"
 

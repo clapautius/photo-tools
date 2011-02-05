@@ -7,6 +7,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QLabel>
+#include <QLayout>
 
 
 class PhotoArchiveWnd : public QDialog
@@ -24,6 +25,10 @@ protected slots:
 
     void searchArchByName();
 
+    void checkArchive();
+
+    void checkCarefullyArchive();
+
     void itemClicked(QListWidgetItem *pItem);
     
 private:
@@ -39,6 +44,12 @@ private:
     void writeToStatusBar(const QString text="");
 
     void updateDisplay();
+
+    QHBoxLayout *mpButtonsLayout;
+    
+    QPushButton *mpCloseButton;
+    QPushButton *mpCheckButton;
+    QPushButton *mpCarefullyCheckButton;
 
     QPushButton *mpSearchButton;
     

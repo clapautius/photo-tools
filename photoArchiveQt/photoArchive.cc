@@ -1,6 +1,7 @@
 #include <QMessageBox>
 #include <QObject>
 #include <QDir>
+#include <QProcess>
 
 #include "main.h"
 #include "photoArchive.h"
@@ -103,3 +104,46 @@ PhotoArchive::findImagesRec(QString dirName,
     }
     return true;
 }
+
+
+std::vector<QFileInfo>
+PhotoArchive::getImagesList() const
+{
+    vector<QFileInfo> result;
+    for (unsigned int i=0; i<mFileList.size(); i++) {
+        if (isImageFilename(mFileList[i])) {
+            result.push_back(mFileList[i]);
+        }
+    }
+    return result;
+}
+
+
+bool
+PhotoArchive::compareFiles(const QString file1, const QString file2)
+{
+    QString prg="cmp";
+    QStringList args;
+    args<<file1<<file2;
+    QProcess *pProc=new QProcess;
+    // :fixme: I don't know how to discard output
+    //pProc->closeReadChannel(QProcess::StandardOutput);
+    //pProc->closeReadChannel(QProcess::StandardError);
+    //pProc->setStandardOutputFile("/dev/null");
+    //pProc->setStandardErrorFile("/dev/null");
+    int rc=pProc->execute(prg, args);
+    if (pProc->exitStatus() == QProcess::NormalExit) {
+        delete pProc;
+        if (0==rc) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        delete pProc;
+        throw QString("Exception in ")+__FUNCTION__;
+    }
+}
+

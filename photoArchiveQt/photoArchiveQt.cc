@@ -5,7 +5,6 @@
 #include <QMessageBox>
 #include <QGroupBox>
 #include <QSettings>
-#include <QLayout>
 #include <QTemporaryFile>
 
 #include "zlib.h"
@@ -28,12 +27,22 @@ PhotoArchiveWnd::PhotoArchiveWnd( QWidget *, char *)
     setWindowTitle("photoArchiveQt");
 
     // * main buttons
-    QPushButton *closeButton = new QPushButton(tr("Close"));
-    connect(closeButton, SIGNAL(clicked()), this, SLOT(close()));
+    mpCloseButton = new QPushButton(tr("Close"));
+    connect(mpCloseButton, SIGNAL(clicked()), this, SLOT(close()));
 
-    QHBoxLayout *buttonsLayout = new QHBoxLayout;
-    buttonsLayout->addStretch(1);
-    buttonsLayout->addWidget(closeButton);
+    mpCheckButton = new QPushButton(tr("Check archive"));
+    connect(mpCheckButton, SIGNAL(clicked()), this, SLOT(checkArchive()));
+
+    mpCarefullyCheckButton = new QPushButton(tr("Carefully check archive"));
+    connect(mpCarefullyCheckButton, SIGNAL(clicked()), this, SLOT(checkCarefullyArchive()));
+
+    mpButtonsLayout = new QHBoxLayout;
+    mpButtonsLayout->addStretch(1);
+    mpButtonsLayout->addWidget(mpCarefullyCheckButton);
+    mpButtonsLayout->addStretch(1);
+    mpButtonsLayout->addWidget(mpCheckButton);
+    mpButtonsLayout->addStretch(1);
+    mpButtonsLayout->addWidget(mpCloseButton);
 
     // * search fields
     QHBoxLayout *pHLayout1 = new QHBoxLayout;
@@ -68,7 +77,7 @@ PhotoArchiveWnd::PhotoArchiveWnd( QWidget *, char *)
     mainLayout->addWidget(mpStatusBar);
     //mainLayout->addStretch(1);
     mainLayout->addSpacing(8);
-    mainLayout->addLayout(buttonsLayout);
+    mainLayout->addLayout(mpButtonsLayout);
     setLayout(mainLayout);
 }
 
@@ -131,6 +140,9 @@ PhotoArchiveWnd::disableUserInteraction()
 {
     mpSearchButton->setEnabled(false);
     mpSubstringEdit->setEnabled(false);
+    mpCloseButton->setEnabled(false);
+    mpCheckButton->setEnabled(false);
+    mpCarefullyCheckButton->setEnabled(false);
 }
 
 
@@ -139,6 +151,9 @@ PhotoArchiveWnd::enableUserInteraction()
 {
     mpSearchButton->setEnabled(true);
     mpSubstringEdit->setEnabled(true);
+    mpCloseButton->setEnabled(true);
+    mpCheckButton->setEnabled(true);
+    mpCarefullyCheckButton->setEnabled(true);
 }
 
 
@@ -270,3 +285,78 @@ PhotoArchiveWnd::itemClicked(QListWidgetItem *pCurrent)
     updateDisplay();
 }
 
+
+void
+PhotoArchiveWnd::checkArchive()
+{
+    log(1, "Checking archive");
+
+    disableUserInteraction();
+    writeToStatusBar("Checking archive");
+    updateDisplay();
+
+
+    writeToStatusBar("Finished checking archive");
+    enableUserInteraction();
+    updateDisplay();
+}
+
+
+void
+PhotoArchiveWnd::checkCarefullyArchive()
+{
+    vector<QFileInfo> images=gpArchive->getImagesList();
+    QFileInfo tmp;
+
+    log(1, "Carefully checking archive");
+
+    disableUserInteraction();
+    
+    // sort by size
+    log(1, "Checking duplicates : sorting files (by size), array len=",
+        QString::number(images.size()));
+    writeToStatusBar("Checking duplicates : sorting files (by size)");
+    updateDisplay();
+    for (unsigned int i=0; i<images.size()-1; i++) {
+        if (i%500==0)
+            updateDisplay();
+        for (unsigned int j=i+1; j<images.size(); j++) {
+            if (images[i].size() > images[j].size()) {
+                tmp=images[i];
+                images[i]=images[j];
+                images[j]=tmp;
+            }
+        }
+    }
+
+    // check duplicates
+    writeToStatusBar("Checking duplicates : comparing files with identical size");
+    updateDisplay();
+    for (unsigned int i=0; i<images.size()-1; i++) {
+        if (images[i].size() == images[i+1].size()) {
+            for (unsigned int j=i+1; j<images.size(); j++) {
+                if (images[i].size() == images[j].size()) {
+                    log(2, "Files with identical size: ", images[i].filePath(),
+                        " , ", images[j].filePath());
+                    log(2, "  size=", QString::number(images[i].size()));
+                    writeToStatusBar(QString("Comparing ")+images[i].fileName()+" with "+
+                                     images[j].fileName());
+                    updateDisplay();
+                    if (gpArchive->compareFiles(images[i].filePath(), images[j].filePath())) {
+                        log(1, "Files are identical");
+                        QMessageBox::warning(NULL, tr("Error"),
+                                             QString("Files ")+images[i].fileName()+
+                                             QString(" and ")+images[j].fileName()+
+                                             QString(" are identical."));
+                    }
+                    else {
+                        log(2, "Files are different");
+                    }
+                }
+            }
+        }
+    }
+    writeToStatusBar("Finished carefully checking archive");
+    enableUserInteraction();
+    updateDisplay();
+}
