@@ -24,6 +24,8 @@ protected slots:
 
     void searchArchByName();
 
+    void itemClicked(QListWidgetItem *pItem);
+    
 private:
 
     void disableUserInteraction();

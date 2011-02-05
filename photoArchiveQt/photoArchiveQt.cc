@@ -26,7 +26,7 @@ PhotoArchiveWnd::PhotoArchiveWnd( QWidget *, char *)
     setMinimumWidth(750);
     setMinimumHeight(550);
     setWindowTitle("photoArchiveQt");
-    
+
     // * main buttons
     QPushButton *closeButton = new QPushButton(tr("Close"));
     connect(closeButton, SIGNAL(clicked()), this, SLOT(close()));
@@ -53,8 +53,12 @@ PhotoArchiveWnd::PhotoArchiveWnd( QWidget *, char *)
     mpList->setSizePolicy(policyMax);
     mpList->setIconSize(QSize(DEFAULT_PREVIEW_SIZE, DEFAULT_PREVIEW_SIZE));
 
+    connect(mpList, SIGNAL(itemClicked(QListWidgetItem*)),
+            this, SLOT(itemClicked(QListWidgetItem*)));
+
     // * status bar
     mpStatusBar=new QLabel;
+    mpStatusBar->setTextInteractionFlags(Qt::TextSelectableByMouse);
     
     // * main layout
     QVBoxLayout *mainLayout = new QVBoxLayout;
@@ -251,3 +255,18 @@ PhotoArchiveWnd::updateDisplay()
     update();
     gApp->processEvents();
 }
+
+
+void
+PhotoArchiveWnd::itemClicked(QListWidgetItem *pCurrent)
+{
+    QString fileName(pCurrent->text());
+    log(1, "current item is now ", fileName);
+    QString text=fileName.right(fileName.length()-fileName.lastIndexOf("/")-1);
+    text+=" (";
+    text+=fileName.left(fileName.lastIndexOf("/"));
+    text+=")";
+    writeToStatusBar(text);
+    updateDisplay();
+}
+
