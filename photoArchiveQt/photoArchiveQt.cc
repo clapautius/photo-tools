@@ -33,16 +33,12 @@ PhotoArchiveWnd::PhotoArchiveWnd( QWidget *, char *)
     mpCheckButton = new QPushButton(tr("Check archive"));
     connect(mpCheckButton, SIGNAL(clicked()), this, SLOT(checkArchive()));
 
-    mpCarefullyCheckButton = new QPushButton(tr("Carefully check archive"));
-    connect(mpCarefullyCheckButton, SIGNAL(clicked()), this, SLOT(checkCarefullyArchive()));
-
     mpButtonsLayout = new QHBoxLayout;
-    mpButtonsLayout->addStretch(1);
-    mpButtonsLayout->addWidget(mpCarefullyCheckButton);
     mpButtonsLayout->addStretch(1);
     mpButtonsLayout->addWidget(mpCheckButton);
     mpButtonsLayout->addStretch(1);
     mpButtonsLayout->addWidget(mpCloseButton);
+    mpButtonsLayout->addStretch(1);
 
     // * search fields
     QHBoxLayout *pHLayout1 = new QHBoxLayout;
@@ -142,7 +138,6 @@ PhotoArchiveWnd::disableUserInteraction()
     mpSubstringEdit->setEnabled(false);
     mpCloseButton->setEnabled(false);
     mpCheckButton->setEnabled(false);
-    mpCarefullyCheckButton->setEnabled(false);
 }
 
 
@@ -153,7 +148,6 @@ PhotoArchiveWnd::enableUserInteraction()
     mpSubstringEdit->setEnabled(true);
     mpCloseButton->setEnabled(true);
     mpCheckButton->setEnabled(true);
-    mpCarefullyCheckButton->setEnabled(true);
 }
 
 
@@ -295,23 +289,23 @@ PhotoArchiveWnd::checkArchive()
     writeToStatusBar("Checking archive");
     updateDisplay();
 
+    vector<QFileInfo> images=gpArchive->getImagesList();
+    checkDuplicates(images);
 
-    writeToStatusBar("Finished checking archive");
+    QMessageBox::information(NULL, tr("Info"), tr("Finished checking archive"));
+    writeToStatusBar();
     enableUserInteraction();
     updateDisplay();
 }
 
 
 void
-PhotoArchiveWnd::checkCarefullyArchive()
+PhotoArchiveWnd::checkDuplicates(vector<QFileInfo> &images)
 {
-    vector<QFileInfo> images=gpArchive->getImagesList();
     QFileInfo tmp;
 
-    log(1, "Carefully checking archive");
+    log(1, "Checking duplicates in the archive");
 
-    disableUserInteraction();
-    
     // sort by size
     log(1, "Checking duplicates : sorting files (by size), array len=",
         QString::number(images.size()));
@@ -356,7 +350,4 @@ PhotoArchiveWnd::checkCarefullyArchive()
             }
         }
     }
-    writeToStatusBar("Finished carefully checking archive");
-    enableUserInteraction();
-    updateDisplay();
 }

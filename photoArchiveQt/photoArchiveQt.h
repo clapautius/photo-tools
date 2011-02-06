@@ -27,8 +27,6 @@ protected slots:
 
     void checkArchive();
 
-    void checkCarefullyArchive();
-
     void itemClicked(QListWidgetItem *pItem);
     
 private:
@@ -37,6 +35,8 @@ private:
 
     void enableUserInteraction();
 
+    void checkDuplicates(std::vector<QFileInfo> &);
+    
     static QPixmap generatePreview(const QFileInfo &rFile);
 
     static bool uncompressToTmp(const QString &filePath, QString &tmpFileName);
@@ -49,7 +49,6 @@ private:
     
     QPushButton *mpCloseButton;
     QPushButton *mpCheckButton;
-    QPushButton *mpCarefullyCheckButton;
 
     QPushButton *mpSearchButton;
     
