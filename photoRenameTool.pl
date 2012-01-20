@@ -341,3 +341,7 @@ if(!$gSkipXmp) {
 }
 
 processFiles;
+
+if (!$gSkipXmp) {
+    print STDERR "\n\033[0;31m* Reread metadata in digikam !\033[0m\n\n";
+}
