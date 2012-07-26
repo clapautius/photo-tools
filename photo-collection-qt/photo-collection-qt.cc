@@ -7,7 +7,7 @@
 #include <QSettings>
 #include <QDir>
 
-#include "photoCollectionQt.h"
+#include "photo-collection-qt.h"
 
 using std::vector;
 using std::map;

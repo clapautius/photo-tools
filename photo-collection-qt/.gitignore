@@ -1,4 +1,3 @@
-/photoCollectionQt
-/Makefile
+/photo-collection-qt
 /moc_*
 /*.o

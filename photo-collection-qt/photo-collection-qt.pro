@@ -8,5 +8,5 @@ DEPENDPATH += .
 INCLUDEPATH += .
 
 # Input
-HEADERS += photoCollectionQt.h
-SOURCES += photoCollectionQt.cc
+HEADERS += photo-collection-qt.h
+SOURCES += photo-collection-qt.cc
