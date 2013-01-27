@@ -23,12 +23,7 @@ QSettings gSettings("clapautius", "photoCollectionQt");
 
 void log(unsigned level, QString s1, QString s2="", QString s3="");
 
-
-static const char*
-qstr2cchar(const QString &str)
-{
-    return str.toUtf8().constData();
-}
+#define Q_STR(x) (x).toUtf8().constData()
 
 
 /// escapes special XML chars and returns a QString
@@ -554,7 +549,7 @@ PhotoCollectionWnd::updatePhotoXml()
     }
     QString xmlPath=getXmlFilename(mPhotoFileName);
     log(1, "creating xml file with name ", xmlPath);
-    if (access(xmlPath.toStdString().c_str(), F_OK)==0) {
+    if (QFile::exists(xmlPath) == 0) {
         if (QMessageBox::Yes != QMessageBox::question(
                 NULL, tr("Confirmation"),
                 tr("XML file already exists. Overwrite?"),
@@ -571,11 +566,14 @@ PhotoCollectionWnd::updatePhotoXml()
                               tr("Cannot open XML file for writing."));
         return;
     }
-    const char *p=qstr2cchar(xmlText);
+    const char *p = Q_STR(xmlText);
+    if (strlen(p) <= 0) {
+        QMessageBox::critical(NULL, tr("Error"), tr("Empty XML output"));
+        return;
+    }
     fout.write(p, strlen(p));
     if (!fout.good()) {
-        QMessageBox::critical(NULL, tr("Error"),
-                              tr("Error writing XML data."));
+        QMessageBox::critical(NULL, tr("Error"), tr("Error writing XML data."));
         log(0, "error writing XML data");
         fout.close();
         return;
