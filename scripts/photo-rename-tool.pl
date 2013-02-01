@@ -6,7 +6,7 @@ use Image::ExifTool;
 #use Date::Parse;
 #use Data::Dumper;
 
-$gVersion="2011-11-18-0"; # :release:
+$gVersion="2013-02-01-0"; # :release:
 
 #my @list = `ls -1 *JPG *jpg *jpeg *JPEG *.NEF *.nef`;
 my @list = `find . -maxdepth 1 \\( \\( -iname '*.nef' -o -iname '*.jpg' \\) -o -iname '*.jpeg' \\) -printf "%f\n"`;
@@ -108,6 +108,10 @@ sub processExifTags {
 	}
 	elsif($cameraModel eq "NIKON D300" && $cameraSn eq "4131283") {
 		$_[1].="_c3";
+		$cameraDetected=1;
+	}
+	elsif($cameraModel eq "NIKON D600" && $cameraSn eq "6021196") {
+		$_[1].="_c4";
 		$cameraDetected=1;
 	}
 	elsif($cameraModel eq "FinePix S5600") {
