@@ -16,17 +16,17 @@
     (when (not (= crop-style 0))
           (gimp-image-crop image 2480 3508 scanner-offset-x scanner-offset-y))
 
-    (gimp-levels-stretch (car (gimp-image-get-active-drawable image)))
-    (plug-in-unsharp-mask 1 image (car (gimp-image-get-active-drawable image)) 3 0.3 1)
-
-    (when (or (= quality 0) (= quality 1) (= quality 2))
-          (gimp-image-scale image new-width new-height))
-
     (when (or (= quality 0) (= quality 1))
           (gimp-image-convert-grayscale image))
 
     (when (= quality 2)
           (gimp-image-convert-indexed image NO-DITHER WEB-PALETTE 0 FALSE TRUE ""))
+
+    (gimp-levels-stretch (car (gimp-image-get-active-drawable image)))
+    (plug-in-unsharp-mask 1 image (car (gimp-image-get-active-drawable image)) 3 0.3 1)
+
+    (when (or (= quality 0) (= quality 1) (= quality 2))
+          (gimp-image-scale image new-width new-height))
 
     (gimp-image-undo-group-end image)
     (gimp-displays-flush)))
