@@ -113,5 +113,5 @@
 
 (script-fu-menu-register
 "script-fu-border-sfd"
-_"<Image>/Filters/"
+_"<Image>/Filters/sfd/"
 )

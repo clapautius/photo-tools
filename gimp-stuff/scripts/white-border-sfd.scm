@@ -142,4 +142,4 @@
 
 (script-fu-menu-register
  "script-fu-white-border-sfd"
- _"<Image>/Filters/" )
+ _"<Image>/Filters/sfd/" )
