@@ -2,13 +2,14 @@
 ;;; 72 dpi (web) = 595 X 842 pixels
 ;;; 300 dpi (print) = 2480 X 3508 pixels (This is "A4" as I know it, i.e. "210mm X 297mm @ 300 dpi")
 
-;;; ver: 2016-01-09-0
+;;; ver: 2016-01-09-1
 
 (define QUAL_BW_75DPI 0)
 (define QUAL_GREY_150DPI 1)
 (define QUAL_COLOR_150DPI 2)
 (define QUAL_COLOR_300DPI 3)
 (define QUAL_COLOR_75DPI 4)
+(define QUAL_GREY_300DPI 5)
 
 (define (75dpi? qual)
   (or (= qual QUAL_BW_75DPI) (= qual QUAL_COLOR_75DPI)))
@@ -16,6 +17,10 @@
 
 (define (150dpi? qual)
   (or (= qual QUAL_GREY_150DPI) (= qual QUAL_COLOR_150DPI)))
+
+
+(define (coloured? qual)
+  (or (= qual QUAL_COLOR_75DPI) (= qual QUAL_COLOR_150DPI) (= qual QUAL_COLOR_300DPI)))
 
 
 (define (script-fu-sfd-scan-postproc image crop-style quality)
@@ -50,10 +55,10 @@
             (set! new-height (/ (* new-width (car (gimp-drawable-height drawable))) (car (gimp-drawable-width drawable))))
             (gimp-image-scale image new-width new-height)))
 
-    (when (or (= quality QUAL_BW_75DPI) (= quality QUAL_GREY_150DPI))
+    (when (not (coloured? quality))
           (gimp-image-convert-grayscale image))
 
-    (when (or (= quality QUAL_COLOR_150DPI) (= quality QUAL_COLOR_75DPI))
+    (when (and (coloured? quality) (not (= quality QUAL_COLOR_300DPI)))
           ;;(gimp-image-convert-indexed image NO-DITHER WEB-PALETTE 0 FALSE TRUE ""))
           ;; dither methods: NO-DITHER, FS-DITHER, FSLOWBLEED-DITHER
           (gimp-image-convert-indexed image NO-DITHER MAKE-PALETTE 256 FALSE TRUE ""))
@@ -78,7 +83,8 @@
                         "grey, 150dpi, email"
                         "color, 150dpi, email"
                         "color, 300dpi, preserve details"
-                        "color, 75dpi, archive"))
+                        "color, 75dpi, archive"
+                        "grey, 300dpi, preserve details"))
 
 
 (script-fu-menu-register
