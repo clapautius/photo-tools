@@ -2,7 +2,21 @@
 ;;; 72 dpi (web) = 595 X 842 pixels
 ;;; 300 dpi (print) = 2480 X 3508 pixels (This is "A4" as I know it, i.e. "210mm X 297mm @ 300 dpi")
 
-;;; ver: 2016-01-04-0
+;;; ver: 2016-01-09-0
+
+(define QUAL_BW_75DPI 0)
+(define QUAL_GREY_150DPI 1)
+(define QUAL_COLOR_150DPI 2)
+(define QUAL_COLOR_300DPI 3)
+(define QUAL_COLOR_75DPI 4)
+
+(define (75dpi? qual)
+  (or (= qual QUAL_BW_75DPI) (= qual QUAL_COLOR_75DPI)))
+
+
+(define (150dpi? qual)
+  (or (= qual QUAL_GREY_150DPI) (= qual QUAL_COLOR_150DPI)))
+
 
 (define (script-fu-sfd-scan-postproc image crop-style quality)
 
@@ -10,9 +24,9 @@
          ;; a4 for canon lide - so that the right and bottom margins are visible
          ;; :fixme: not good for other scanners? make a parameter?
          (a4-width 2488) (a4-height 3504)
-         (new-width (if (= quality 0) 595 (if (or (= quality 1) (= quality 2)) 1240 0)))
+         (new-width (if (75dpi? quality) 595 (if (150dpi? quality) 1240 0)))
          ;; this is ignored - it is computed from the current aspect ratio
-         (new-height (if (= quality 0) 842 (if (or (= quality 1) (= quality 2)) 1754 0)))
+         (new-height (if (75dpi? quality) 842 (if (150dpi? quality) 1754 0)))
          (scanner-offset-x 4)
          (scanner-offset-y 4))
 
@@ -31,15 +45,15 @@
     (gimp-levels-stretch (car (gimp-image-get-active-drawable image)))
     (plug-in-unsharp-mask 1 image (car (gimp-image-get-active-drawable image)) 3 0.3 1)
 
-    (when (or (= quality 0) (= quality 1) (= quality 2))
+    (when (or (75dpi? quality) (150dpi? quality))
           (let ((drawable (car (gimp-image-get-active-drawable image))))
             (set! new-height (/ (* new-width (car (gimp-drawable-height drawable))) (car (gimp-drawable-width drawable))))
             (gimp-image-scale image new-width new-height)))
 
-    (when (or (= quality 0) (= quality 1))
+    (when (or (= quality QUAL_BW_75DPI) (= quality QUAL_GREY_150DPI))
           (gimp-image-convert-grayscale image))
 
-    (when (= quality 2)
+    (when (or (= quality QUAL_COLOR_150DPI) (= quality QUAL_COLOR_75DPI))
           ;;(gimp-image-convert-indexed image NO-DITHER WEB-PALETTE 0 FALSE TRUE ""))
           ;; dither methods: NO-DITHER, FS-DITHER, FSLOWBLEED-DITHER
           (gimp-image-convert-indexed image NO-DITHER MAKE-PALETTE 256 FALSE TRUE ""))
@@ -60,7 +74,11 @@
  "*"
  SF-IMAGE	"Input image"		 0
  SF-OPTION "Crop style" '("no crop" "start 20x10")
- SF-OPTION  "Quality" '("black&white, 75dpi, archive" "grey, 150dpi, email" "color, 150dpi, email" "color, 300dpi, preserve details"))
+ SF-OPTION  "Quality" '("black&white, 75dpi, archive"
+                        "grey, 150dpi, email"
+                        "color, 150dpi, email"
+                        "color, 300dpi, preserve details"
+                        "color, 75dpi, archive"))
 
 
 (script-fu-menu-register
