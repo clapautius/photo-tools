@@ -2,7 +2,7 @@
 ;;; 72 dpi (web) = 595 X 842 pixels
 ;;; 300 dpi (print) = 2480 X 3508 pixels (This is "A4" as I know it, i.e. "210mm X 297mm @ 300 dpi")
 
-;;; ver: 2016-01-09-2
+;;; ver: 2016-01-11-0
 
 (define QUAL-BW-75DPI 0)
 (define QUAL-GREY-150DPI 1)
@@ -29,7 +29,7 @@
   (or (= qual QUAL-COLOR-75DPI) (= qual QUAL-COLOR-150DPI) (= qual QUAL-COLOR-300DPI)))
 
 
-(define (script-fu-sfd-scan-postproc image crop-style quality)
+(define (script-fu-sfd-scan-postproc image crop-style quality skip-autolevels dont-group-undo)
 
   (let* ((new-width (if (75dpi? quality) 595 (if (150dpi? quality) 1240 0)))
          ;; it is computed from the current aspect ratio
@@ -39,7 +39,8 @@
 
     ;;Undo group start
     ;; :debug: comment for debug
-    (gimp-image-undo-group-start image)
+    (when (= dont-group-undo FALSE)
+          (gimp-image-undo-group-start image))
 
     ;; crop
     ;; :fixme: check overflows
@@ -49,7 +50,8 @@
     (when (not (= crop-style 0))
           (gimp-image-crop image A4-WIDTH A4-HEIGHT scanner-offset-x scanner-offset-y))
 
-    (gimp-levels-stretch (car (gimp-image-get-active-drawable image)))
+    (when (= skip-autolevels FALSE)
+          (gimp-levels-stretch (car (gimp-image-get-active-drawable image))))
     (plug-in-unsharp-mask 1 image (car (gimp-image-get-active-drawable image)) 3 0.3 1)
 
     (when (or (75dpi? quality) (150dpi? quality))
@@ -66,7 +68,8 @@
           (gimp-image-convert-indexed image NO-DITHER MAKE-PALETTE 256 FALSE TRUE ""))
 
     ;; :debug: comment for debug
-    (gimp-image-undo-group-end image)
+    (when (= dont-group-undo FALSE)
+          (gimp-image-undo-group-end image))
 
     (gimp-displays-flush)))
 
@@ -77,7 +80,7 @@
  "Export jpeg 75% for first option; 85% for 150dpi"
  "Tudor M. Pristavu"
  "Free for any purpose"
- "2016-01-01"
+ "2016-01-11"
  "*"
  SF-IMAGE	"Input image"		 0
  SF-OPTION "Crop style" '("no crop" "start 20x10")
@@ -86,7 +89,9 @@
                         "color, 150dpi, email"
                         "color, 300dpi, preserve details"
                         "color, 75dpi, archive"
-                        "grey, 300dpi, preserve details"))
+                        "grey, 300dpi, preserve details")
+ SF-TOGGLE "Skip auto-levels" FALSE
+ SF-TOGGLE "Don't group undo (debug)" FALSE)
 
 
 (script-fu-menu-register
