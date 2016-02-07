@@ -212,12 +212,14 @@ sub tagFile {
 		return 0;
 	}
 	my $exifCmd="exiftool -o \"$fnameImg.xmp\" ";
+	$exifCmd.=" -TagsFromFile @ ";
+    $exifCmd.=" -Iptc:CodedCharacterSet=\"UTF8\" ";
     $exifCmd.=" -xmp:Location=\"$gTagLocation\" ";
+    $exifCmd.=" -Iptc:Sub-location=\"$gTagLocation\" ";
 	$exifCmd.=" -xmp:CountryCode=\"$gTagCountryCode\" ";
 	$exifCmd.=" -xmp:Creator=\"$gTagAuthor\" ";
 	#$exifCmd.=" -xmp:CreatorContactInfoCiUrlWork=\"$gTagUrl\" ";
 	$exifCmd.=" -xmp:CreatorWorkURL=\"$gTagUrl\" ";
-	$exifCmd.=" -TagsFromFile @ ";
 	$exifCmd.=$_[0];
 	$gDebug && print "  :debug: exiftool cmd: $exifCmd\n";
 	if(!execCmd($exifCmd)) {
