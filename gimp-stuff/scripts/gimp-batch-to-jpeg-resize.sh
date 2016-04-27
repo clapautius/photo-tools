@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -z "$1" ]; then
-    echo "Usage: gimp-bath-to-jpeg-resize.sh <size> [<output-dir>]"
+    echo "Usage: gimp-batch-to-jpeg-resize.sh <size> [<output-dir>]"
     exit 1
 fi
 

@@ -44,9 +44,12 @@
 
     ;; crop
     ;; :fixme: check overflows
-    (when (= crop-style 1) ; start at 20x20
+    (when (= crop-style 1) ; start at 20x10
           (set! scanner-offset-x 20)
           (set! scanner-offset-y 10))
+    (when (= crop-style 2) ; start at 20x4
+          (set! scanner-offset-x 20)
+          (set! scanner-offset-y 4))
     (when (not (= crop-style 0))
           (gimp-image-crop image A4-WIDTH A4-HEIGHT scanner-offset-x scanner-offset-y))
 
@@ -83,7 +86,7 @@
  "2016-01-11"
  "*"
  SF-IMAGE	"Input image"		 0
- SF-OPTION "Crop style" '("no crop" "start 20x10")
+ SF-OPTION "Crop style" '("no crop" "start 20x10" "start 20x4")
  SF-OPTION  "Quality" '("black&white, 75dpi, archive"
                         "grey, 150dpi, email"
                         "color, 150dpi, email"

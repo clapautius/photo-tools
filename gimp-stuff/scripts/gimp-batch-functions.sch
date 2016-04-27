@@ -41,3 +41,22 @@
 
 
 (gimp-message-set-handler 1) ; Messages to standard output
+
+
+(define (postproc-scan-img-and-save-jpeg filename outfile rotate-right extra-crop)
+  (let* ((image (car (gimp-file-load RUN-NONINTERACTIVE filename filename)))
+         (drawable (car (gimp-image-merge-visible-layers image CLIP-TO-IMAGE))))
+    ;;(script-fu-sfd-scan-postproc image crop-style quality skip-autolevels dont-group-undo)
+    ;; crop-style : 2 (off: 20x4)
+    ;; skip-autolevels : TRUE
+    ;; dont-group-undo : FALSE
+    (script-fu-sfd-scan-postproc image 2 QUAL-COLOR-300DPI TRUE FALSE)
+    (when extra-crop
+          ;; crop 40x40px (e.g. notebook is smaller than A4)
+          (let* ((orig-width (car (gimp-image-width image)))
+                 (orig-height (car (gimp-image-height image))))
+            (gimp-image-crop image (- orig-width 40) (- orig-height 40) 0 0)))
+    (when rotate-right
+          (gimp-image-rotate image ROTATE-90))
+    (file-jpeg-save RUN-NONINTERACTIVE image drawable outfile outfile .80 0 0 0 " " 0 1 0 1)
+    (gimp-image-delete image))) ; ... or the memory will explode
