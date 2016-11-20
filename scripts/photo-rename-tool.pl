@@ -6,7 +6,7 @@ use Image::ExifTool;
 #use Date::Parse;
 #use Data::Dumper;
 
-$gVersion="2013-02-01-0"; # :release:
+$gVersion="2016-11-20-0"; # :release:
 
 #my @list = `ls -1 *JPG *jpg *jpeg *JPEG *.NEF *.nef`;
 my @list = `find . -maxdepth 1 \\( \\( -iname '*.nef' -o -iname '*.jpg' \\) -o -iname '*.jpeg' \\) -printf "%f\n"`;
@@ -41,7 +41,7 @@ sub dumpEveryTag {
 	my $exifImg = new Image::ExifTool;
 	print "EXIF data for file $_[0]\n";
 	my $exifInfo = $exifImg->ImageInfo($_[0]);
-	
+
 	if($exifImg->GetValue("Error")) {
 		return 0;
 	}
@@ -67,7 +67,7 @@ sub processExifTags {
 	my $exifImg = new Image::ExifTool;
 	$gDebug && print "  :debug: extract exif from file $_[0]\n";
 	my $exifInfo = $exifImg->ImageInfo($_[0]);
-	
+
 	if($exifImg->GetValue("Error")) {
 		return 0;
 	}
@@ -101,6 +101,7 @@ sub processExifTags {
 	$cameraModel =~ s/\s+$//; # trim spaces at the end
 	my $cameraSn=$exifImg->GetValue("SerialNumber");
 	$cameraSn =~ s/\s+$//; # trim spaces at the end
+    $gDebug && print "\n  :debug: camera model: $cameraModel; serialNum: $cameraSn\n";
 	my $cameraDetected=0;
 	if($cameraModel eq "NIKON D80" && $cameraSn eq "4292942") {
 		$_[1].="_c2";
@@ -112,6 +113,11 @@ sub processExifTags {
 	}
 	elsif($cameraModel eq "NIKON D600" && $cameraSn eq "6021196") {
 		$_[1].="_c4";
+		$cameraDetected=1;
+	}
+	elsif($cameraModel eq "D5503") {
+        # sony xperia - assume it's mine
+		$_[1].="_c5";
 		$cameraDetected=1;
 	}
 	elsif($cameraModel eq "FinePix S5600") {
@@ -145,7 +151,7 @@ sub processExifTags {
 
 
 # Return: the new name or 0 on error.
-# Warning: the file might not exist if the -n option is specified (to create only a script).	
+# Warning: the file might not exist if the -n option is specified (to create only a script).
 sub renameFile {
 	my $srcName=$_[0];
 	my $dstName="";
