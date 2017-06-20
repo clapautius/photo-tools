@@ -54,15 +54,24 @@
     ;; skip-autolevels : TRUE
     ;; dont-group-undo : FALSE
     (script-fu-sfd-scan-postproc image 2 quality TRUE FALSE)
-    (when extra-crop
+    (when (= extra-crop TRUE)
           ;; crop 40x40px (e.g. notebook is smaller than A4)
           (let* ((orig-width (car (gimp-image-width image)))
                  (orig-height (car (gimp-image-height image))))
+            (gimp-message ":debug: extra-cropping")
             (gimp-image-crop image (- orig-width 40) (- orig-height 40) 0 0)))
-    (when rotate-right
+    (when (= rotate-right TRUE)
+          (gimp-message ":debug: rotating")
           (gimp-image-rotate image ROTATE-90))
     (catch
      (begin (gimp-message "Error saving jpeg file!") FALSE)
      (file-jpeg-save RUN-NONINTERACTIVE image drawable outfile outfile .70 0 0 0 " " 0 1 0 1)
      (gimp-image-delete image) ; ... or the memory will explode
      TRUE)))
+
+;;; Returns TRUE if OK, FALSE on error.
+(define (postproc-batch-scan-grey-150dpi filename outfile)
+  ;; rotate-right = FALSE
+  ;; extra-crop = FALSE
+  ;; QUAL-GREY-150DPI = 1
+  (postproc-scan-img-and-save-jpeg filename outfile FALSE FALSE 1))

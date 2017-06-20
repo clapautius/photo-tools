@@ -1,0 +1,6 @@
+* gimp-batch-postproc-generic.sh *
+
+Examples:
+
+$ <full_path>/gimp-batch-postproc-generic.sh gimp-batch-functions.sch postproc-batch-scan-grey-150dpi output-dir
+  - there's no need to use full path for the 'sch' file
