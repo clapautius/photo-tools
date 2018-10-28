@@ -8,11 +8,11 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion="2011-02-19-0";
+$gVersion="2018-10-28-0";
 $gDebug=0;
-$gPhotoCollectionPath="/home/me/var/etc/alternatives/colectieFoto";
-$gPodPath="/home/me/var/run/pod/";
-$gFlagsDir="/home/me/var/settings/colectieFotoFlags";
+$gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
+$gPodPath = $ENV{'HOME'} . "/var/run/pod/";
+$gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
 $gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
 
 sub debugMsg {
@@ -27,19 +27,10 @@ sub convertImage
 	$destinationFile=$_[1];
 	$maxHeight=780; # :fixme: - cmd line param.
 	$maxWidht=950; # :fixme: - cmd line param.
-	
-	#$currentHeightLine=qx/identify -verbose "$photoFile" | fgrep "Geometry"/;
-	#die "identify error" if($?);
-	#if($currentHeightLine =~ /.*Geometry: [0-9]*x([0-9]*)\+.*/) {
-	#	$currentHeight=$1;
-	#}
-	#else {
-	#	$currentHeight=0;
-	#}
-	
+
 	my $currentHeight=qx/identify -ping -format "%h" "$photoFile"/;
 	die "identify error" if($?);
-	$gDebug && print "  :debug: Height: $currentHeight \n";	
+	$gDebug && print "  :debug: Height: $currentHeight \n";
 	if($currentHeight<$maxHeight) {
 		$gDebug && print "  :debug: Skipping resize \n";
 		$resizePercent1=100;
@@ -50,10 +41,9 @@ sub convertImage
 		$skipResize=0;
 	}
 
-
 	my $currentWidth=qx/identify -ping -format "%w" "$photoFile"/;
 	die "identify error" if($?);
-	$gDebug && print "  :debug: Width: $currentWidth \n";	
+	$gDebug && print "  :debug: Width: $currentWidth \n";
 	if($currentWidth<$maxWidht) {
 		$gDebug && print "  :debug: Skipping resize \n";
 		$resizePercent2=100;
@@ -126,8 +116,8 @@ sub printHtml
 <style type="text/css">
 		 html { background-color: black; color: white; }
 		 img { border: 1px solid white; margin-top: 2px; }
-		 
-div.details { 
+
+div.details {
   background-color: transparent;
   color: #ccc;
   /*font-weight: bold;*/
@@ -157,8 +147,9 @@ span.author { font-weight: bold; }
 
 	print HTMLFILE "<img src=\"$_[1]\">\n";
 	print HTMLFILE "<div class=\"details\">\n";
-	print HTMLFILE "$_[4] ; ";
-	print HTMLFILE "<span class=\"author\">$_[2]</span><br>\n";
+	print HTMLFILE "$_[4]";
+    print HTMLFILE " ; <span class=\"author\">$_[2]</span>" if ($_[2]);
+	print HTMLFILE "<br>\n";
 	#print HTMLFILE "Sursa: $_[3]<br>\n";
 	print HTMLFILE '
 </div>
@@ -166,41 +157,6 @@ span.author { font-weight: bold; }
 </body>
 </html>';
 	close(HTMLFILE);
-}
-
-
-# DEPRECATED
-sub selectADir
-{
-	my $photoPath=$_[0];
-	$gDebug && print("  :debug: scanning dir. $photoPath \n");
-	return 0 if(!opendir(PDIR, $photoPath));
-	my @dirContent=readdir(PDIR);
-	closedir(PDIR);
-	my @dirs;
-	my $filename;
-	foreach $filename (@dirContent) {
-		if($filename ne "." && $filename ne ".." && (-d "$photoPath"."/"."$filename")) {
-			$gDebug && print "  :debug: found a dir: $filename \n";
-			push(@dirs, $filename);
-			if (-e "$photoPath"."/"."$filename"."/flag.x2") {
-				$gDebug && print "  :debug: dir $filename has multiplication factor 2\n";
-				push(@dirs, $filename);
-			}
-		}
-		#else {
-		#	$gDebug && print "  :debug: found a non-dir: $filename \n";
-		#}
-	}
-	my $noOfDirs=scalar(@dirs);
-	$gDebug && print("  :debug: no. of dirs in photo collection: $noOfDirs \n");
-	return 0 if($noOfDirs <=0);
-	my $selectedDirNum=int(rand($noOfDirs));	
-	$gDebug && print("  :debug: selected dir. no.: $selectedDirNum \n");
-	my $selectedDir=$photoPath."/";
-	$selectedDir.=$dirs[$selectedDirNum];
-	$gDebug && print("  :debug: selected dir.: $selectedDir \n");
-	return $selectedDir;
 }
 
 
@@ -260,7 +216,7 @@ sub processFile {
 sub selectAFile {
 	find({ wanted => \&processFile, follow => 1 } , ( $_[0] ) );
 	debugMsg("No. of files in list: ".($#gImgFileList+1));
-	
+
 	# :debug:
 	#for ($i=0; $i<=$#gImgFileList; $i++) {
 	#	debugMsg($gImgFileList[$i]);
@@ -332,7 +288,7 @@ $gDebug && print("  :debug: photo collection path: $gPhotoCollectionPath\n");
 $gDebug && print("  :debug: pod path: $gPodPath\n");
 
 # basic checks
--d "$gFlagsDir" || die "Flags dir does not exist.";
+-d "$gFlagsDir" && print "\nWARNING: flags dir $gFlagsDir does not exist.\n";
 -d "$gPhotoCollectionPath" || die "Photo collection dir does not exist.";
 -d "$gPodPath" || die "POD path does not exist.";
 
@@ -344,8 +300,15 @@ while($tries<5) {
 	if($selectedPhoto) {
 		binmode STDOUT, ":utf8";
 		my $xmlFile=replaceExtension($selectedPhoto, "xml");
-		if (getXmlData($xmlFile, $filename, $author, $source, $title, $nsfw)<=0) {
-			print STDERR "Error parsing XML file $fileToLoad.\n";
+        if (! -e $xmlFile) {
+            debugMsg("No xml file for image $selectedPhoto");
+            $filename="";
+            $author="";
+            $source="";
+            $title = substr($selectedPhoto, length($gPhotoCollectionPath) + 1);
+            $nsfw=0; # :fixme:
+        } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $nsfw)<=0) {
+            print STDERR "Error parsing XML file $fileToLoad.\n";
 			exit(3);
 		}
 		if ($nsfw) {
@@ -353,8 +316,8 @@ while($tries<5) {
 			next;
 		}
 		else {
-			convertImage($selectedPhoto, $gPodPath."/"."photo.png");
-			printHtml($gPodPath."/"."photo.html", $gPodPath."/"."photo.png", $author, $source, $title);
+			convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png");
+			printHtml($gPodPath."/"."photo-pod.html", "photo-pod.png", $author, $source, $title);
 			last;
 		}
 	}
