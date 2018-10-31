@@ -8,15 +8,24 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion="2018-10-28-0";
+$gVersion="2018-10-31-0";
 $gDebug=0;
+$gHeavyDebug=0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
 $gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
 
+@gProbabilitiesRegex = ();
+@gProbabilitiesFactor = ();
+
 sub debugMsg {
 	$gDebug && print ":debug: $_[0]\n";
+}
+
+
+sub debugHeavyMsg {
+	$gHeavyDebug && print ":debug: $_[0]\n";
 }
 
 
@@ -161,16 +170,32 @@ span.author { font-weight: bold; }
 
 
 sub displayUsage {
-	print "photoCollection-pod.pl ver. $gVersion\n";
-	print "usage: photoCollection-pod.pl ";
-	print "[ -c <collectionPath> ] [ -d <destination> ] [ -v ]\n";
+	print "photo-collection-pod.pl ver. $gVersion\n";
+	print "usage: photo-collection-pod.pl [ -t ] [ -c <collectionPath> ] [ -d <destination> ] [ -v ]\n";
 	print "  -v = verbose on\n";
+    print "  -t : run tests\n";
 }
 
 
-sub replaceExtension {
+sub fpathReplaceExtension {
 	$_[0] =~ /(.*)\..*/;
 	return "$1.$_[1]";
+}
+
+
+# returns an array (path, filename, extension)
+sub fpathSplit {
+    debugHeavyMsg("fpathSplit: splitting $_[0]");
+    my @arr;
+    if ($_[0] =~ m|(.*)/+(.*)\.(.*)$|) {
+        @arr = ($1, $2, $3);
+    } elsif ($_[0] =~ /(.*)\.(.*)$/) {
+        @arr = ("", $1, $2);
+    } else {
+        @arr = ("", $_[0], "");
+    }
+    debugHeavyMsg("fpathSplit: $arr[0], $arr[1], $arr[2]\n");
+    return @arr;
 }
 
 
@@ -180,27 +205,56 @@ sub isImageFile {
 }
 
 
-@gImgFileList=();
+# images (with full path)
+@gImgFileList = ();
+
+# images (only filename, without path or extension)
+@gImgFileOnlyList = ();
+
+sub alterProbability {
+    my $ret = 0;
+    if ($gProbabilitiesFactor[$_[0]] eq "-1") {
+        $ret = -1;
+    } elsif ($gProbabilitiesFactor[$_[0]] eq "-2") {
+        $ret = -2;
+    } elsif ($gProbabilitiesFactor[$_[0]] eq "+2") {
+        $ret = 2;
+    } else {
+        $ret = 0;
+    }
+    return $ret;
+}
+
 
 sub processFile {
-	#debugMsg("Analyzing file $File::Find::name"); # :debug:
+	#debugMsg("Analyzing file / dir $File::Find::name"); # :debug:
 	if (isImageFile($File::Find::name)) {
-		my $flagFile;
-		my $probability=2;
-
+        $img = $File::Find::name;
 		debugMsg("Analyzing image file $File::Find::name");
+        ($fpath, $fname, $fext) = fpathSplit($img);
 
-		# check x2 flag
-		$flagFile=$gFlagsDir."/".replaceExtension($_, "flag_x2");
-		if (-e $flagFile) {
-			$probability=4;
-		}
+        # check if not already present
+        foreach(@gImgFileOnlyList) {
+            if ($_ eq $img) {
+                print "\n\nERROR: Duplicate image: $_\n\n";
+                exit(3);
+            }
+        }
+        push(@gImgFileOnlyList, $fname);
 
-		# check x-2 flag
-		$flagFile=$gFlagsDir."/".replaceExtension($_, "flag_x-2");
-		if (-e $flagFile) {
-			$probability=1;
-		}
+		my $flagFile;
+		my $probability=3;
+
+        # alter probabilities
+        for my $i (0 .. $#gProbabilitiesRegex) {
+            #debugMsg("checking prob $gProbabilitiesRegex[$i] for $img");
+            my $probregex=$gProbabilitiesRegex[$i];
+            if ($img =~ m|$probregex|) {
+                debugMsg("$img matches $probregex");
+                $probability += alterProbability($i);
+                debugMsg("New probability is $probability");
+            }
+        }
 
 		for ($i=0; $i<$probability; $i++) {
 			push(@gImgFileList, $File::Find::name);
@@ -209,10 +263,50 @@ sub processFile {
 }
 
 
+sub readProbabilities {
+    open(my $fh, '<:encoding(UTF-8)', "$ENV{HOME}/.photo-collection-pod")
+        or die "Could not open file $ENV{HOME}/.photo-collection-pod $!";
+
+    while (my $row = <$fh>) {
+        chomp $row;
+        if ($row =~ "^#") {
+            debugMsg("continue (next)");
+            next;
+        }
+        @rowElts = split /\s+/, $row;
+        push(@gProbabilitiesFactor, $rowElts[0]);
+        push(@gProbabilitiesRegex, $rowElts[1]);
+    }
+    debugMsg("probabilities regex: @gProbabilitiesRegex");
+    debugMsg("probabilities regex: @gProbabilitiesFactor");
+}
+
+
+sub runTests {
+    debugMsg("Running tests");
+
+    $testIn="file";
+    @arr = fpathSplit($testIn);
+    print "$testIn : @arr\n";
+
+    $testIn="file.txt";
+    @arr = fpathSplit($testIn);
+    print "$testIn : @arr\n";
+
+    $testIn="/file.txt";
+    @arr = fpathSplit($testIn);
+    print "$testIn : @arr\n";
+
+    $testIn = "/home/file.txt";
+    @arr = fpathSplit($testIn);
+    print "$testIn : @arr\n";
+}
+
+
 # $_[0] - collection path
 # $_[1] - flags dir
 # returns the image filename (e.g. photo.jpg)
-# to obtain the xml filename, use replaceExtension()
+# to obtain the xml filename, use fpathReplaceExtension()
 sub selectAFile {
 	find({ wanted => \&processFile, follow => 1 } , ( $_[0] ) );
 	debugMsg("No. of files in list: ".($#gImgFileList+1));
@@ -236,12 +330,16 @@ sub selectAFile {
 
 # test area
 #$gDebug=1;
-#debugMsg(replaceExtension("bibi.jpg", "xml"));
+#debugMsg(fpathReplaceExtension("bibi.jpg", "xml"));
 #exit(0);
 
 while(scalar @ARGV > 0) {
 	if($ARGV[0] eq "-h") {
 		displayUsage;
+		exit 1;
+	}
+	elsif($ARGV[0] eq "-t") {
+        runTests;
 		exit 1;
 	}
 	elsif($ARGV[0] eq "-c") {
@@ -293,13 +391,14 @@ $gDebug && print("  :debug: pod path: $gPodPath\n");
 -d "$gPodPath" || die "POD path does not exist.";
 
 my $tries=0;
+readProbabilities;
 
 while($tries<5) {
 	my $selectedPhoto=selectAFile($gPhotoCollectionPath);
 	my $nsfw;
 	if($selectedPhoto) {
 		binmode STDOUT, ":utf8";
-		my $xmlFile=replaceExtension($selectedPhoto, "xml");
+		my $xmlFile=fpathReplaceExtension($selectedPhoto, "xml");
         if (! -e $xmlFile) {
             debugMsg("No xml file for image $selectedPhoto");
             $filename="";
