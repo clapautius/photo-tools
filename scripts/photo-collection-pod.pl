@@ -4,20 +4,27 @@
 # script that selects a random picture from a
 #  photo collection (directories containing images and associated .xml files)
 
+# E.g. config file (strip first 2 chars)
+# # comment
+# fpath old/ -2
+# tags safety-moderate 0
+
 use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion="2018-10-31-0";
-$gDebug=0;
-$gHeavyDebug=0;
+$gVersion = "2018-10-31-0";
+$gDebug = 0;
+$gHeavyDebug = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
 $gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
 
-@gProbabilitiesRegex = ();
-@gProbabilitiesFactor = ();
+# :fixme: replace with a struct or smth.
+@gProbabilitiesAlterType = ();
+@gProbabilitiesAlterValue = ();
+@gProbabilitiesalterFactor = ();
 
 sub debugMsg {
 	$gDebug && print ":debug: $_[0]\n";
@@ -79,10 +86,10 @@ sub convertImage
 
 
 # @return 0 on error
-# $_[5]=1 if nsfw
+# $_[5] : tags
 sub getXmlData
 {
-	$gDebug && print "  :debug: trying to load xml file $_[0] \n";
+    debugMsg("  :debug: trying to load xml file $_[0]");
 	# If the file does not exist, the program dies.
 	# Not a good idea, XML::XPath should be replaced with something better.
 	my $xp = XML::XPath->new(filename => "$_[0]");
@@ -101,14 +108,9 @@ sub getXmlData
 	$_[4] = $nodeset->string_value();
 
 	$nodeset = $xp->find('/photo/tag');
-	my $nodesetText=$nodeset->to_literal();
-	if ($nodesetText =~ /safety-moderate/) {
-		$gDebug && print "  :debug: xml contains 'safety-moderate' tag \n";
-		$_[5]=1;
-	}
-	else {
-		$_[5]=0;
-	}
+	$_[5] = $nodeset->to_literal();
+    debugHeavyMsg("tags: $_[5]");
+
 	return 1;
 }
 
@@ -194,14 +196,16 @@ sub fpathSplit {
     } else {
         @arr = ("", $_[0], "");
     }
-    debugHeavyMsg("fpathSplit: $arr[0], $arr[1], $arr[2]\n");
+    debugHeavyMsg("fpathSplit: $arr[0], $arr[1], $arr[2]");
     return @arr;
 }
 
 
 sub isImageFile {
 	#return ($_[0] =~ /$gImageFnameRegexp/i); # :debug:
-	return (-f "$_[0]" && $_[0] =~ m/$gImageFnameRegexp/i);
+    my $rc = (-f "$_[0]" && $_[0] =~ m/$gImageFnameRegexp/i);
+	debugHeavyMsg("isImageFile: result for $_[0] is $rc");
+    return $rc;
 }
 
 
@@ -211,31 +215,33 @@ sub isImageFile {
 # images (only filename, without path or extension)
 @gImgFileOnlyList = ();
 
+# $_[0] : old probability
+# $_[1] : index in gProbabilitiesAlterFactor array
 sub alterProbability {
-    my $ret = 0;
-    if ($gProbabilitiesFactor[$_[0]] eq "-1") {
-        $ret = -1;
-    } elsif ($gProbabilitiesFactor[$_[0]] eq "-2") {
-        $ret = -2;
-    } elsif ($gProbabilitiesFactor[$_[0]] eq "+2") {
-        $ret = 2;
-    } else {
+    my $ret = $_[0];
+    if ($gProbabilitiesAlterFactor[$_[1]] eq "-1") {
+        $ret = $_[0] - 1;
+    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "-2") {
+        $ret = $_[0] - 2;
+    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "+2") {
+        $ret = $_[0] + 2;
+    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "0") {
         $ret = 0;
-    }
+    };
     return $ret;
 }
 
 
 sub processFile {
-	#debugMsg("Analyzing file / dir $File::Find::name"); # :debug:
+	debugHeavyMsg("Analyzing file / dir $File::Find::name"); # :debug:
 	if (isImageFile($File::Find::name)) {
-        $img = $File::Find::name;
+        $imgPath = $File::Find::name;
 		debugMsg("Analyzing image file $File::Find::name");
-        ($fpath, $fname, $fext) = fpathSplit($img);
+        ($fpath, $fname, $fext) = fpathSplit($imgPath);
 
         # check if not already present
         foreach(@gImgFileOnlyList) {
-            if ($_ eq $img) {
+            if ($_ eq $fname) {
                 print "\n\nERROR: Duplicate image: $_\n\n";
                 exit(3);
             }
@@ -245,15 +251,42 @@ sub processFile {
 		my $flagFile;
 		my $probability=3;
 
+        # read data from xml (if available)
+        my $xmlFile = fpathReplaceExtension($imgPath, "xml");
+        if (! -e $xmlFile) {
+            debugMsg("No xml file for image $imgPath");
+            $filename = "";
+            $author = "";
+            $source = "";
+            $title = $fname;
+            $tags = "";
+        } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $tags)<=0) {
+            print STDERR "Error parsing XML file $fileToLoad.\n";
+			exit(3);
+		}
+
         # alter probabilities
-        for my $i (0 .. $#gProbabilitiesRegex) {
-            #debugMsg("checking prob $gProbabilitiesRegex[$i] for $img");
-            my $probregex=$gProbabilitiesRegex[$i];
-            if ($img =~ m|$probregex|) {
-                debugMsg("$img matches $probregex");
-                $probability += alterProbability($i);
-                debugMsg("New probability is $probability");
+        for my $i (0 .. $#gProbabilitiesAlterType) {
+            debugMsg("checking prob for index $i for $imgPath; type=$gProbabilitiesAlterType[$i], value=$gProbabilitiesAlterValue[$i], factor=$gProbabilitiesAlterFactor[$i]");
+
+            if ($gProbabilitiesAlterType[$i] eq 'fpath') {
+                my $probregex = $gProbabilitiesAlterValue[$i];
+                if ($imgPath =~ m|$probregex|) {
+                    debugMsg("$img matches $probregex");
+                    $probability = alterProbability($probability, $i);
+                    debugMsg("New probability is $probability");
+                }
             }
+
+            if ($gProbabilitiesAlterType[$i] eq 'tags') {
+                my $probregex = $gProbabilitiesAlterValue[$i];
+                if ($tags =~ m|$probregex|) {
+                    debugMsg("tags $tags (for image $imgPath) match $probregex");
+                    $probability = alterProbability($probability, $i);
+                    debugMsg("New probability is $probability");
+                }
+            }
+
         }
 
 		for ($i=0; $i<$probability; $i++) {
@@ -274,10 +307,12 @@ sub readProbabilities {
             next;
         }
         @rowElts = split /\s+/, $row;
-        push(@gProbabilitiesFactor, $rowElts[0]);
-        push(@gProbabilitiesRegex, $rowElts[1]);
+        # :fixme: validate data
+        push(@gProbabilitiesAlterType, $rowElts[0]);
+        push(@gProbabilitiesAlterValue, $rowElts[1]);
+        push(@gProbabilitiesAlterFactor, $rowElts[2]);
+
     }
-    debugMsg("probabilities regex: @gProbabilitiesRegex");
     debugMsg("probabilities regex: @gProbabilitiesFactor");
 }
 
@@ -308,7 +343,7 @@ sub runTests {
 # returns the image filename (e.g. photo.jpg)
 # to obtain the xml filename, use fpathReplaceExtension()
 sub selectAFile {
-	find({ wanted => \&processFile, follow => 1 } , ( $_[0] ) );
+	find({ wanted => \&processFile, follow => 1, no_chdir => 1 } , ( $_[0] ) );
 	debugMsg("No. of files in list: ".($#gImgFileList+1));
 
 	# :debug:
@@ -392,41 +427,28 @@ $gDebug && print("  :debug: pod path: $gPodPath\n");
 
 my $tries=0;
 readProbabilities;
+binmode STDOUT, ":utf8";
 
-while($tries<5) {
-	my $selectedPhoto=selectAFile($gPhotoCollectionPath);
-	my $nsfw;
-	if($selectedPhoto) {
-		binmode STDOUT, ":utf8";
-		my $xmlFile=fpathReplaceExtension($selectedPhoto, "xml");
-        if (! -e $xmlFile) {
-            debugMsg("No xml file for image $selectedPhoto");
-            $filename="";
-            $author="";
-            $source="";
-            $title = substr($selectedPhoto, length($gPhotoCollectionPath) + 1);
-            $nsfw=0; # :fixme:
-        } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $nsfw)<=0) {
-            print STDERR "Error parsing XML file $fileToLoad.\n";
-			exit(3);
-		}
-		if ($nsfw) {
-			$tries++;
-			next;
-		}
-		else {
-			convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png");
-			printHtml($gPodPath."/"."photo-pod.html", "photo-pod.png", $author, $source, $title);
-			last;
-		}
-	}
-	else {
-		print STDERR "Cannot choose a file from collection (invalid collection?)\n";
-		exit(2);
-	}
+my $selectedPhoto=selectAFile($gPhotoCollectionPath);
+if($selectedPhoto) {
+    my $xmlFile=fpathReplaceExtension($selectedPhoto, "xml");
+    # :fixme: don't read the xml twice - try to keep the old data in memory
+    # (or not?, maybe that's too much info? to check)
+    if (! -e $xmlFile) {
+        debugMsg("No xml file for image $selectedPhoto");
+        $filename = "";
+        $author = "";
+        $source = "";
+        $title = substr($selectedPhoto, length($gPhotoCollectionPath) + 1);
+        $tags = "";
+    } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $tags)<=0) {
+        print STDERR "Error parsing XML file $fileToLoad.\n";
+        exit(3);
+    }
+    convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png");
+    printHtml($gPodPath."/"."photo-pod.html", "photo-pod.png", $author, $source, $title);
 }
-
-if ($tries>=5) {
-	print STDERR "Too many tries. Something is wrong! \n";
-	exit(4);
+else {
+    print STDERR "Cannot choose a file from collection (invalid collection?)\n";
+    exit(2);
 }
