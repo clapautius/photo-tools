@@ -225,6 +225,8 @@ sub alterProbability {
         $ret = $_[0] - 2;
     } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "+2") {
         $ret = $_[0] + 2;
+    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "*10") {
+        $ret = $_[0] * 10;
     } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "0") {
         $ret = 0;
     };
@@ -267,7 +269,7 @@ sub processFile {
 
         # alter probabilities
         for my $i (0 .. $#gProbabilitiesAlterType) {
-            debugMsg("checking prob for index $i for $imgPath; type=$gProbabilitiesAlterType[$i], value=$gProbabilitiesAlterValue[$i], factor=$gProbabilitiesAlterFactor[$i]");
+            debugHeavyMsg("checking prob for index $i for $imgPath; type=$gProbabilitiesAlterType[$i], value=$gProbabilitiesAlterValue[$i], factor=$gProbabilitiesAlterFactor[$i]");
 
             if ($gProbabilitiesAlterType[$i] eq 'fpath') {
                 my $probregex = $gProbabilitiesAlterValue[$i];
