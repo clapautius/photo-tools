@@ -1,0 +1,1 @@
+Bug: names / notes containing strange utf8 chars break the xml.
