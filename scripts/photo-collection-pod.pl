@@ -2,12 +2,14 @@
 
 # new picture of the day
 # script that selects a random picture from a
-#  photo collection (directories containing images and associated .xml files)
+#  photo collection - directories containing images (with or without associated .xml files)
 
 # E.g. config file (strip first 2 chars)
 # # comment
+# cmd-match-type cmd-match-value commands (comma separated)
+# cmds: +<num>, -<num>, =<num>, !
 # fpath old/ -2
-# tags safety-moderate 0
+# tags safety-moderate =0,!
 
 use XML::XPath;
 use XML::XPath::XMLParser;
@@ -20,6 +22,8 @@ $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
 $gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
+
+@gConfigCmds = ();
 
 # :fixme: replace with a struct or smth.
 @gProbabilitiesAlterType = ();
@@ -216,21 +220,90 @@ sub isImageFile {
 @gImgFileOnlyList = ();
 
 # $_[0] : old probability
-# $_[1] : index in gProbabilitiesAlterFactor array
+# $_[1] : probability factor
 sub alterProbability {
     my $ret = $_[0];
-    if ($gProbabilitiesAlterFactor[$_[1]] eq "-1") {
+    if ($_[1] eq "-1") {
         $ret = $_[0] - 1;
-    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "-2") {
+    } elsif ($_[1] eq "-2") {
         $ret = $_[0] - 2;
-    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "+2") {
+    } elsif ($_[1] eq "+2") {
         $ret = $_[0] + 2;
-    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "*10") {
+    } elsif ($_[1] eq "*10") {
         $ret = $_[0] * 10;
-    } elsif ($gProbabilitiesAlterFactor[$_[1]] eq "0") {
+    } elsif ($_[1] eq "0") {
         $ret = 0;
     };
     return $ret;
+}
+
+
+# The function returns ($continue, $newProbability)
+# $_[0] : cmd
+# $_[1] : old probability
+sub executeOneCommand {
+    my $newVal = $_[1];
+    my $cont = 1;
+    if ($_[0] =~ /^\s*\+\s*(\d+)\s*$/) {
+        $newVal += $1;
+    }
+    if ($_[0] =~ /^\s*-\s*(\d+)\s*$/) {
+        $newVal -= $1;
+    }
+    if ($_[0] =~ /^\s*=\s*(\d+)\s*$/) {
+        $newVal = $1;
+    }
+    if ($_[0] =~ /^\s*!\s*$/) {
+        $cont = 0;
+    }
+    return ($cont, $newVal);
+}
+
+
+# The function returns ($continue, $probabilityFactor)
+# $_[0] - image full path
+# $_[1] - image tags
+sub executeConfigCmds {
+    my $imgPath = $_[0];
+    my $tags = $_[1];
+    my @result = (1, 0);
+    my $cont = 1;
+    my $probability = 0;
+
+    # alter probabilities
+    ALL_CMDS: for my $i (0 .. $#gConfigCmds) {
+        debugHeavyMsg("checking prob for index $i for $imgPath");
+        debugHeavyMsg("config cmd. is " . $gConfigCmds[$i]);
+        if ($gConfigCmds[$i]{'cmd-match-type'} eq 'fpath') {
+            my $probregex = $gConfigCmds[$i]{'cmd-match-value'};
+            if ($imgPath =~ m|$probregex|) {
+                debugMsg("$imgPath matches $probregex");
+                my @commands = split(',', $gConfigCmds[$i]{'commands'});
+                foreach (@commands) {
+                    ($cont, $probability) = executeOneCommand($_, $probability);
+                    debugMsg("New probability (after command $_) is $probability");
+                    if ($cont == 0) {
+                        last ALL_CMDS;
+                    }
+                }
+            }
+        }
+        if ($gConfigCmds[$i]{'cmd-match-type'} eq 'tags') {
+            my $probregex = $gConfigCmds[$i]{'cmd-match-value'};
+            if ($tags =~ m|$probregex|) {
+                debugMsg("tags $tags (for image $imgPath) match $probregex");
+                my @commands = split(',', $gConfigCmds[$i]{'commands'});
+                foreach (@commands) {
+                    ($cont, $probability) = executeOneCommand($_, $probability);
+                    debugMsg("New probability (after command $_) is $probability");
+                    if ($cont == 0) {
+                        last ALL_CMDS;
+                    }
+                }
+            }
+        }
+    }
+    return ($cont, $probability);
 }
 
 
@@ -274,8 +347,8 @@ sub processFile {
             if ($gProbabilitiesAlterType[$i] eq 'fpath') {
                 my $probregex = $gProbabilitiesAlterValue[$i];
                 if ($imgPath =~ m|$probregex|) {
-                    debugMsg("$img matches $probregex");
-                    $probability = alterProbability($probability, $i);
+                    debugMsg("$imgPath matches $probregex");
+                    $probability = alterProbability($probability, $gProbabilitiesAlterFactor[$i]);
                     debugMsg("New probability is $probability");
                 }
             }
@@ -284,7 +357,7 @@ sub processFile {
                 my $probregex = $gProbabilitiesAlterValue[$i];
                 if ($tags =~ m|$probregex|) {
                     debugMsg("tags $tags (for image $imgPath) match $probregex");
-                    $probability = alterProbability($probability, $i);
+                    $probability = alterProbability($probability, $gProbabilitiesAlterFactor[$i]);
                     debugMsg("New probability is $probability");
                 }
             }
@@ -337,6 +410,30 @@ sub runTests {
     $testIn = "/home/file.txt";
     @arr = fpathSplit($testIn);
     print "$testIn : @arr\n";
+
+    my %elt = ( 'cmd-match-type' => 'fpath',
+                'cmd-match-value' => 'match',
+                'commands' => '+2' );
+    push(@gConfigCmds, \%elt);
+    my ($cont, $factor) = executeConfigCmds("fpath-that-matches", "no-tags");
+    print "cont=$cont, factor=$factor\n (expected: 1, 2)\n";
+
+    ($cont, $factor) = executeOneCommand("+52", -2);
+    print "cont=$cont, factor=$factor\n (expected: 1, 50)\n";
+
+    ($cont, $factor) = executeOneCommand("=32", 0);
+    print "cont=$cont, factor=$factor\n (expected: 1, 32)\n";
+
+    ($cont, $factor) = executeOneCommand(" ! ", 0);
+    print "cont=$cont, factor=$factor\n (expected: 0, 0)\n";
+
+    %elt = ( 'cmd-match-type' => 'fpath',
+             'cmd-match-value' => 'match',
+             'commands' => '-7,!' );
+    push(@gConfigCmds, \%elt);
+    my ($cont, $factor) = executeConfigCmds("fpath-that-matches", "no-tags");
+    print "cont=$cont, factor=$factor\n (expected: 0, -7)\n";
+
 }
 
 
