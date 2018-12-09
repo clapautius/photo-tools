@@ -119,6 +119,11 @@ sub getXmlData
 }
 
 
+# $_[0] - output html
+# $_[1] - image src
+# $_[2] - author
+# $_[3] - source (or path without filename)
+# $_[4] - title (or filename)
 sub printHtml
 {
 	$gDebug && print "  :debug: writing to html file $_[0] \n";
@@ -129,26 +134,29 @@ sub printHtml
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Photo</title>
 <style type="text/css">
-		 html { background-color: black; color: white; }
-		 img { border: 1px solid white; margin-top: 2px; }
+  html { background-color: black; color: white; }
+  img {
+    /*border: 1px solid white;*/
+    margin-top: 2px;
+  }
 
 div.details {
-  background-color: transparent;
-  color: #ccc;
+  background-color: #151515;
+  color: #dcc;
   /*font-weight: bold;*/
   /*width: 32%;*/
-  width: 75%;
+  width: 80%;
   margin: 0.5em;
-  border: 1px solid #ccc;
-  /* border-style: solid none; */
-  border-style: none;
+  margin-top: 15px;
+  border: 2px solid #111;
+  /* border-style: none; */
   /*
   position: fixed;
   top: auto;
   right: 5%;
   bottom: 10%;
   */
-  font-size: small;
+  /*font-size: small;*/
   font-family: "Consolas",sans;
   left: auto;
 }
@@ -165,7 +173,9 @@ span.author { font-weight: bold; }
 	print HTMLFILE "$_[4]";
     print HTMLFILE " ; <span class=\"author\">$_[2]</span>" if ($_[2]);
 	print HTMLFILE "<br>\n";
-	#print HTMLFILE "Sursa: $_[3]<br>\n";
+    if ($_[3]) {
+        print HTMLFILE "($_[3])<br>\n";
+    }
 	print HTMLFILE '
 </div>
 </div>
@@ -507,8 +517,10 @@ if($selectedPhoto) {
         debugMsg("No xml file for image $selectedPhoto");
         $filename = "";
         $author = "";
-        $source = "";
-        $title = substr($selectedPhoto, length($gPhotoCollectionPath) + 1);
+        my $filepath = substr($selectedPhoto, length($gPhotoCollectionPath) + 1);
+        my ($a, $b, $c) = fpathSplit($filepath);
+        $title = $b . "." . $c;
+        $source = $a;
         $tags = "";
     } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $tags)<=0) {
         print STDERR "Error parsing XML file $fileToLoad.\n";
