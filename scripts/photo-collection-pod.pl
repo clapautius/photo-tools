@@ -4,10 +4,15 @@
 # script that selects a random picture from a
 #  photo collection - directories containing images (with or without associated .xml files)
 
-# E.g. config file (strip first 2 chars)
-# # comment
+# Config file format
 # cmd-match-type cmd-match-value commands (comma separated)
 # cmds: +<num>, -<num>, =<num>, !
+#   +<num> : increase probability
+#   -<num> : decrease probability
+#   =<num> : set probability
+#   ! : stop processing other commands for this file
+# E.g.
+# # comment
 # fpath old/ -2
 # tags safety-moderate =0,!
 
@@ -15,7 +20,7 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion = "2018-10-31-0";
+$gVersion = "2018-12-09-0";
 $gDebug = 0;
 $gHeavyDebug = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
@@ -25,18 +30,13 @@ $gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
 
 @gConfigCmds = ();
 
-# :fixme: replace with a struct or smth.
-@gProbabilitiesAlterType = ();
-@gProbabilitiesAlterValue = ();
-@gProbabilitiesalterFactor = ();
-
 sub debugMsg {
 	$gDebug && print ":debug: $_[0]\n";
 }
 
 
 sub debugHeavyMsg {
-	$gHeavyDebug && print ":debug: $_[0]\n";
+	$gHeavyDebug && print ":debug: :heavy: $_[0]\n";
 }
 
 
@@ -93,7 +93,7 @@ sub convertImage
 # $_[5] : tags
 sub getXmlData
 {
-    debugMsg("  :debug: trying to load xml file $_[0]");
+    debugMsg("  trying to load xml file $_[0]");
 	# If the file does not exist, the program dies.
 	# Not a good idea, XML::XPath should be replaced with something better.
 	my $xp = XML::XPath->new(filename => "$_[0]");
@@ -219,24 +219,6 @@ sub isImageFile {
 # images (only filename, without path or extension)
 @gImgFileOnlyList = ();
 
-# $_[0] : old probability
-# $_[1] : probability factor
-sub alterProbability {
-    my $ret = $_[0];
-    if ($_[1] eq "-1") {
-        $ret = $_[0] - 1;
-    } elsif ($_[1] eq "-2") {
-        $ret = $_[0] - 2;
-    } elsif ($_[1] eq "+2") {
-        $ret = $_[0] + 2;
-    } elsif ($_[1] eq "*10") {
-        $ret = $_[0] * 10;
-    } elsif ($_[1] eq "0") {
-        $ret = 0;
-    };
-    return $ret;
-}
-
 
 # The function returns ($continue, $newProbability)
 # $_[0] : cmd
@@ -260,50 +242,61 @@ sub executeOneCommand {
 }
 
 
-# The function returns ($continue, $probabilityFactor)
+# The function returns new probability (0 <= $probability <= 20)
 # $_[0] - image full path
 # $_[1] - image tags
+# $_[2] - original probability
 sub executeConfigCmds {
     my $imgPath = $_[0];
     my $tags = $_[1];
     my @result = (1, 0);
     my $cont = 1;
-    my $probability = 0;
+    my $probability = $_[2];
 
+    debugHeavyMsg("");
+    debugHeavyMsg("checking filters for $imgPath");
     # alter probabilities
-    ALL_CMDS: for my $i (0 .. $#gConfigCmds) {
-        debugHeavyMsg("checking prob for index $i for $imgPath");
-        debugHeavyMsg("config cmd. is " . $gConfigCmds[$i]);
-        if ($gConfigCmds[$i]{'cmd-match-type'} eq 'fpath') {
-            my $probregex = $gConfigCmds[$i]{'cmd-match-value'};
+    ALL_CMDS: foreach(@gConfigCmds) {
+        debugHeavyMsg("cmd-match-type : " . $$_{'cmd-match-type'} .
+                      "; cmd-match-value : " . $$_{'cmd-match-value'} .
+                      "; commands : " . $$_{'commands'});
+        if ($$_{'cmd-match-type'} eq 'fpath') {
+            my $probregex = $$_{'cmd-match-value'};
             if ($imgPath =~ m|$probregex|) {
                 debugMsg("$imgPath matches $probregex");
-                my @commands = split(',', $gConfigCmds[$i]{'commands'});
+                my @commands = split(',', $$_{'commands'});
+                debugHeavyMsg("executing commands: @commands");
                 foreach (@commands) {
                     ($cont, $probability) = executeOneCommand($_, $probability);
                     debugMsg("New probability (after command $_) is $probability");
                     if ($cont == 0) {
+                        debugMsg("  stop processing filters");
                         last ALL_CMDS;
                     }
                 }
             }
         }
-        if ($gConfigCmds[$i]{'cmd-match-type'} eq 'tags') {
-            my $probregex = $gConfigCmds[$i]{'cmd-match-value'};
+        if ($$_{'cmd-match-type'} eq 'tags') {
+            my $probregex = $$_{'cmd-match-value'};
             if ($tags =~ m|$probregex|) {
                 debugMsg("tags $tags (for image $imgPath) match $probregex");
-                my @commands = split(',', $gConfigCmds[$i]{'commands'});
+                my @commands = split(',', $$_{'commands'});
+                debugHeavyMsg("executing commands: @commands");
                 foreach (@commands) {
                     ($cont, $probability) = executeOneCommand($_, $probability);
                     debugMsg("New probability (after command $_) is $probability");
                     if ($cont == 0) {
+                        debugMsg("  stop processing filters");
                         last ALL_CMDS;
                     }
                 }
             }
         }
     }
-    return ($cont, $probability);
+    $probability = 0 if ($probability < 0);
+    $probability = 20 if ($probability > 20);
+    debugMsg("Final probability is $probability");
+    return $probability;
 }
 
 
@@ -340,29 +333,7 @@ sub processFile {
 			exit(3);
 		}
 
-        # alter probabilities
-        for my $i (0 .. $#gProbabilitiesAlterType) {
-            debugHeavyMsg("checking prob for index $i for $imgPath; type=$gProbabilitiesAlterType[$i], value=$gProbabilitiesAlterValue[$i], factor=$gProbabilitiesAlterFactor[$i]");
-
-            if ($gProbabilitiesAlterType[$i] eq 'fpath') {
-                my $probregex = $gProbabilitiesAlterValue[$i];
-                if ($imgPath =~ m|$probregex|) {
-                    debugMsg("$imgPath matches $probregex");
-                    $probability = alterProbability($probability, $gProbabilitiesAlterFactor[$i]);
-                    debugMsg("New probability is $probability");
-                }
-            }
-
-            if ($gProbabilitiesAlterType[$i] eq 'tags') {
-                my $probregex = $gProbabilitiesAlterValue[$i];
-                if ($tags =~ m|$probregex|) {
-                    debugMsg("tags $tags (for image $imgPath) match $probregex");
-                    $probability = alterProbability($probability, $gProbabilitiesAlterFactor[$i]);
-                    debugMsg("New probability is $probability");
-                }
-            }
-
-        }
+        $probability = executeConfigCmds($imgPath, $tags, $probability);
 
 		for ($i=0; $i<$probability; $i++) {
 			push(@gImgFileList, $File::Find::name);
@@ -382,13 +353,12 @@ sub readProbabilities {
             next;
         }
         @rowElts = split /\s+/, $row;
-        # :fixme: validate data
-        push(@gProbabilitiesAlterType, $rowElts[0]);
-        push(@gProbabilitiesAlterValue, $rowElts[1]);
-        push(@gProbabilitiesAlterFactor, $rowElts[2]);
+        my %configCmd = ('cmd-match-type' => $rowElts[0],
+                         'cmd-match-value' => $rowElts[1],
+                         'commands' => $rowElts[2]);
+        push(@gConfigCmds, \%configCmd);
 
     }
-    debugMsg("probabilities regex: @gProbabilitiesFactor");
 }
 
 
