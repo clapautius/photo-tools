@@ -20,7 +20,7 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion = "2018-12-09-0";
+$gVersion = "2018-12-10-0";
 $gDebug = 0;
 $gHeavyDebug = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
@@ -40,13 +40,17 @@ sub debugHeavyMsg {
 }
 
 
+# $_[0] : input image
+# $_[1] : output image
+# $_[2] : max width
+# $_[3] : max height
 sub convertImage
 {
-	my $skipResize=1;
-	$photoFile=$_[0];
-	$destinationFile=$_[1];
-	$maxHeight=780; # :fixme: - cmd line param.
-	$maxWidht=950; # :fixme: - cmd line param.
+	my $skipResize = 1;
+	$photoFile = $_[0];
+	$destinationFile = $_[1];
+	$maxWidth = $_[2];
+	$maxHeight = $_[3];
 
 	my $currentHeight=qx/identify -ping -format "%h" "$photoFile"/;
 	die "identify error" if($?);
@@ -64,12 +68,12 @@ sub convertImage
 	my $currentWidth=qx/identify -ping -format "%w" "$photoFile"/;
 	die "identify error" if($?);
 	$gDebug && print "  :debug: Width: $currentWidth \n";
-	if($currentWidth<$maxWidht) {
+	if($currentWidth<$maxWidth) {
 		$gDebug && print "  :debug: Skipping resize \n";
 		$resizePercent2=100;
 	}
 	else {
-		$resizePercent2=$maxWidht*100/$currentWidth;
+		$resizePercent2=$maxWidth*100/$currentWidth;
 		$gDebug && print "  :debug: Percent 2: $resizePercent2 \n";
 		$skipResize=0;
 	}
@@ -141,7 +145,7 @@ sub printHtml
   }
 
 div.details {
-  background-color: #151515;
+  background-color: #191919;
   color: #dcc;
   /*font-weight: bold;*/
   /*width: 32%;*/
@@ -172,13 +176,13 @@ span.author { font-weight: bold; }
 	print HTMLFILE "<div class=\"details\">\n";
 	print HTMLFILE "$_[4]";
     print HTMLFILE " ; <span class=\"author\">$_[2]</span>" if ($_[2]);
-	print HTMLFILE "<br>\n";
+	print HTMLFILE "<br/>\n";
     if ($_[3]) {
         print HTMLFILE "($_[3])<br>\n";
     }
 	print HTMLFILE '
 </div>
-</div>
+</div><br/> <!-- one BR is space for KDE icons -->
 </body>
 </html>';
 	close(HTMLFILE);
@@ -187,9 +191,10 @@ span.author { font-weight: bold; }
 
 sub displayUsage {
 	print "photo-collection-pod.pl ver. $gVersion\n";
-	print "usage: photo-collection-pod.pl [ -t ] [ -c <collectionPath> ] [ -d <destination> ] [ -v ]\n";
-	print "  -v = verbose on\n";
+	print "usage: photo-collection-pod.pl [ -t ] [ -c <collectionPath> ] [ -d <destination> ] [ -v ] [ -m <max_width>x<max_height> ]\n";
+	print "  -v : verbose on\n";
     print "  -t : run tests\n";
+    print "  -m : max dimensions (e.g. 500x500)\n";
 }
 
 
@@ -441,12 +446,8 @@ sub selectAFile {
 }
 
 # main
-
-# test area
-#$gDebug=1;
-#debugMsg(fpathReplaceExtension("bibi.jpg", "xml"));
-#exit(0);
-
+my $maxWidth = 950;
+my $maxHeight = 780;
 while(scalar @ARGV > 0) {
 	if($ARGV[0] eq "-h") {
 		displayUsage;
@@ -486,6 +487,18 @@ while(scalar @ARGV > 0) {
 		shift(@ARGV);
 		shift(@ARGV);
 	}
+	elsif($ARGV[0] eq "-m") {
+		if($ARGV[1] && $ARGV[1] =~ /(\d+)x(\d+)/) {
+			$maxWidth = $1;
+            $maxHeight = $2;
+		}
+		else {
+			print STDERR "Error: Invalid dimensions (-m param).\n";
+			exit 1;
+		}
+		shift(@ARGV);
+		shift(@ARGV);
+	}
 	elsif($ARGV[0] eq "-v") {
 		$gDebug=1;
 		shift(@ARGV);
@@ -496,8 +509,9 @@ while(scalar @ARGV > 0) {
 	}
 }
 
-$gDebug && print("  :debug: photo collection path: $gPhotoCollectionPath\n");
-$gDebug && print("  :debug: pod path: $gPodPath\n");
+debugMsg("photo collection path: $gPhotoCollectionPath");
+debugMsg("pod path: $gPodPath");
+debugMsg("max width: $maxWidth, max height: $maxHeight");
 
 # basic checks
 -d "$gFlagsDir" && print "\nWARNING: flags dir $gFlagsDir does not exist.\n";
@@ -526,7 +540,8 @@ if($selectedPhoto) {
         print STDERR "Error parsing XML file $fileToLoad.\n";
         exit(3);
     }
-    convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png");
+    convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png",
+                 $maxWidth, $maxHeight);
     printHtml($gPodPath."/"."photo-pod.html", "photo-pod.png", $author, $source, $title);
 }
 else {
