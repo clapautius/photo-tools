@@ -358,6 +358,7 @@ sub processFile {
 
 
 sub readProbabilities {
+    return 0 if (! -e "$ENV{HOME}/.photo-collection-pod");
     open(my $fh, '<:encoding(UTF-8)', "$ENV{HOME}/.photo-collection-pod")
         or die "Could not open file $ENV{HOME}/.photo-collection-pod $!";
 
@@ -372,7 +373,6 @@ sub readProbabilities {
                          'cmd-match-value' => $rowElts[1],
                          'commands' => $rowElts[2]);
         push(@gConfigCmds, \%configCmd);
-
     }
 }
 
@@ -542,6 +542,7 @@ if($selectedPhoto) {
     }
     convertImage($selectedPhoto, $gPodPath."/"."photo-pod.png",
                  $maxWidth, $maxHeight);
+    $source =~ s|^https?://||;
     printHtml($gPodPath."/"."photo-pod.html", "photo-pod.png", $author, $source, $title);
 }
 else {
