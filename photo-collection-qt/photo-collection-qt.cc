@@ -255,9 +255,18 @@ PhotoCollectionWnd::PhotoCollectionWnd( QWidget *, char *)
     pTypeLayout->addWidget(mpEstablishedBtn);
     pTypeLayout->addWidget(mpPaintingBtn);
     pTypeBox->setLayout(pTypeLayout);
-    
-    // * details & exif
+
+    // * image preview, details & exif
     QHBoxLayout *pHLayout3 = new QHBoxLayout;
+    // image preview
+    QImage emptyImage(QSize(450, 450), QImage::Format_ARGB32);
+    emptyImage.fill(qRgba(0, 0, 0, 0));
+    mpImage = new QImage(emptyImage);
+    mpPreviewWidget = new QLabel;
+    mpPreviewWidget->setPixmap(QPixmap::fromImage(*mpImage));
+    pHLayout3->addWidget(mpPreviewWidget);
+
+    QVBoxLayout *pVDetailsLayout = new QVBoxLayout;
     QGroupBox *pDetailsBox = new QGroupBox(tr("Details"));
     mpDetailsEdit = new QTextEdit;
     mpDetailsEdit->setAcceptRichText(false);
@@ -274,8 +283,9 @@ PhotoCollectionWnd::PhotoCollectionWnd( QWidget *, char *)
     pExifLayout->addWidget(mpExifEdit);
     pExifBox->setLayout(pExifLayout);
 
-    pHLayout3->addWidget(pDetailsBox);
-    pHLayout3->addWidget(pExifBox);
+    pHLayout3->addLayout(pVDetailsLayout);
+    pVDetailsLayout->addWidget(pDetailsBox);
+    pVDetailsLayout->addWidget(pExifBox);
 
     // * tags
 
@@ -289,35 +299,35 @@ PhotoCollectionWnd::PhotoCollectionWnd( QWidget *, char *)
     QGroupBox *pTagsGroup = new QGroupBox;
     pTagsGroup->setLayout(pHLayout4);
 
+    addTagCheckbox("landscape", true);
+    addTagCheckbox("macro-closeup", true);
+    addTagCheckbox("people", true);
+    addTagCheckbox("portrait", true);
+    addTagCheckbox("urban", true);
+    addTagCheckbox("wildlife", true);
+    addTagCheckbox("studio", true);
+    addTagCheckbox("fragments", true);
+    addTagCheckbox("nature", true);
+    addTagCheckbox("safety-moderate", true);
+    addTagCheckbox("photojournalism", true);
+    addTagCheckbox("didactic-pp", true);
     addTagCheckbox("black-white");
-    addTagCheckbox("border");
-    addTagCheckbox("didactic");
-    addTagCheckbox("didactic-pp");
-    addTagCheckbox("duo-tone"); // 5
     addTagCheckbox("fog-rain");
-    addTagCheckbox("fragments");
-    addTagCheckbox("glamour");
     addTagCheckbox("horses");
-    addTagCheckbox("insolit"); // 10
-    addTagCheckbox("landscape");
-    addTagCheckbox("macro-closeup");
+    addTagCheckbox("insolit");
     addTagCheckbox("minimalist");
-    addTagCheckbox("nature");
-    addTagCheckbox("night"); // 15
-    addTagCheckbox("people");
-    addTagCheckbox("photojournalism");
+    addTagCheckbox("night");
     addTagCheckbox("places");
-    addTagCheckbox("portrait");
-    addTagCheckbox("product"); // 20
+    addTagCheckbox("product");
     addTagCheckbox("rural");
-    addTagCheckbox("safety-moderate");
     addTagCheckbox("sunset-sunrise");
-    addTagCheckbox("studio");
     addTagCheckbox("tree");
-    addTagCheckbox("urban");
     addTagCheckbox("water-river-sea");
-    addTagCheckbox("wildlife");
     addTagCheckbox("winter-snow");
+    addTagCheckbox("no-f-detect");
+    addTagCheckbox("border", false, true);
+    addTagCheckbox("duo-tone", false, true);
+    addTagCheckbox("");
     addTagCheckbox(""); // placeholder // 30
 
     // * other tags
@@ -368,6 +378,9 @@ PhotoCollectionWnd::setPhotoFileName(QFileInfo photoFileName)
     log(2, "current image filename is: ",
         mPhotoFileName.fileName());
     setFileNameField(mPhotoFileName);
+    mpImage->load(mPhotoFileName.filePath());
+    mpPreviewWidget->setPixmap(QPixmap::fromImage(mpImage->scaled(QSize(450, 450),
+                                                                  Qt::KeepAspectRatio)));
 }
 
 
@@ -376,12 +389,22 @@ PhotoCollectionWnd::setPhotoFileName(QFileInfo photoFileName)
  * QLabel) will be placed instead.
  **/
 void
-PhotoCollectionWnd::addTagCheckbox(const char* checkboxText)
+PhotoCollectionWnd::addTagCheckbox(const char* checkboxText, bool bold, bool italic)
 {
     QVBoxLayout *pLayoutToUse=NULL;
     pLayoutToUse=mTagsLayouts[mTagLayoutPos];
     if (checkboxText[0]) {
         QCheckBox *pTagCheckbox=new QCheckBox(checkboxText);
+        if (bold && italic) {
+            pTagCheckbox->setStyleSheet("font-weight: bold; font-style: italic;");
+        } else {
+            if (bold) {
+                pTagCheckbox->setStyleSheet("font-weight: bold;");
+            }
+            if (italic) {
+                pTagCheckbox->setStyleSheet("font-style: italic;");
+            }
+        }
         pLayoutToUse->addWidget(pTagCheckbox);
         mStandardTags[checkboxText]=pTagCheckbox;
     }
@@ -489,7 +512,7 @@ PhotoCollectionWnd::generateXmlText() const
     xmlOutput+=nl+QString("<photo type=\"")+getType()+"\">"+nl;
     xmlOutput+=QString("    <filename>")+mPhotoFileName.fileName()+
         "</filename>"+nl;
-    str=toXmlString(getAuthor());
+    str=toXmlString(getAuthor().toUtf8());
     if (str.isEmpty()) {
         QMessageBox::critical(NULL, tr("Error"), tr("Author not specified"));
         return "";
@@ -505,15 +528,15 @@ PhotoCollectionWnd::generateXmlText() const
     else {
         xmlOutput+=QString("    <source>")+str+"</source>"+nl;
     }
-    str=toXmlString(getTitle());
+    str=toXmlString(getTitle().toUtf8());
     if (!str.isEmpty()) {
         xmlOutput+=QString("    <title>")+str+"</title>"+nl;
     }
-    str=toXmlString(getDetails());
+    str=toXmlString(getDetails().toUtf8());
     if (!str.isEmpty()) {
         xmlOutput+=QString("    <details>")+str+nl+"    </details>"+nl;
     }
-    str=toXmlString(getExif());
+    str=toXmlString(getExif().toUtf8());
     if (!str.isEmpty()) {
         xmlOutput+=QString("    <exif>")+str+nl+"    </exif>"+nl;
     }
@@ -636,9 +659,9 @@ PhotoCollectionWnd::lookForImage()
     QString dir;
     vector<QString> excludeList;
     getConfigPaths(dir, excludeList);
-    QString firstImageFount=getFirstUntaggedImage(dir, excludeList);
-    if (!firstImageFount.isEmpty()) {
-        mPhotoFileName.setFile(firstImageFount);
+    QString firstImageFound = getFirstUntaggedImage(dir, excludeList);
+    if (!firstImageFound.isEmpty()) {
+        mPhotoFileName.setFile(firstImageFound);
         resetFields();
     }
     else {

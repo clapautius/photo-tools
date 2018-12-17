@@ -15,7 +15,7 @@
 #include <QCloseEvent>
 #include <QLabel>
 
-#define PHOTO_COLLECTION_QT_VER "1.4.1"
+#define PHOTO_COLLECTION_QT_VER "1.5"
 
 class PhotoCollectionWnd : public QDialog
 {
@@ -71,10 +71,11 @@ private:
   QLineEdit *mpOtherTagsEdit;
   QTextEdit *mpExifEdit;
   QTextEdit *mpDetailsEdit;
-  
+  QImage *mpImage;
+  QLabel *mpPreviewWidget;
   QFileInfo mPhotoFileName;
 
-  void addTagCheckbox(const char* checkboxText);
+  void addTagCheckbox(const char* checkboxText, bool bold = false, bool italic = false);
 
   std::map<QString, QCheckBox*> mStandardTags;
 
