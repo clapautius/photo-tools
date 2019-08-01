@@ -6,7 +6,7 @@ use Image::ExifTool;
 #use Date::Parse;
 #use Data::Dumper;
 
-$gVersion="2016-11-20-0"; # :release:
+$gVersion="2019-07-31-0"; # :release:
 
 #my @list = `ls -1 *JPG *jpg *jpeg *JPEG *.NEF *.nef`;
 my @list = `find . -maxdepth 1 \\( \\( -iname '*.nef' -o -iname '*.jpg' \\) -o -iname '*.jpeg' \\) -printf "%f\n"`;
@@ -72,6 +72,11 @@ sub processExifTags {
 		return 0;
 	}
 
+        # :debug:
+        #foreach (sort keys %$exifInfo) {
+        #    print "$_ => $$exifInfo{$_}\n";
+        #}
+
 	$_[1]="i";
 
 	# get time
@@ -101,7 +106,9 @@ sub processExifTags {
 	$cameraModel =~ s/\s+$//; # trim spaces at the end
 	my $cameraSn=$exifImg->GetValue("SerialNumber");
 	$cameraSn =~ s/\s+$//; # trim spaces at the end
-    $gDebug && print "\n  :debug: camera model: $cameraModel; serialNum: $cameraSn\n";
+	my $cameraProd=$exifImg->GetValue("Make");
+	$cameraProd =~ s/\s+$//; # trim spaces at the end
+	$gDebug && print "\n  :debug: camera model: $cameraModel; serialNum: $cameraSn; producer: $cameraProd\n";
 	my $cameraDetected=0;
 	if($cameraModel eq "NIKON D80" && $cameraSn eq "4292942") {
 		$_[1].="_c2";
@@ -116,8 +123,13 @@ sub processExifTags {
 		$cameraDetected=1;
 	}
 	elsif($cameraModel eq "D5503") {
-        # sony xperia - assume it's mine
+        # sony xperia z1 compact - assume it's mine
 		$_[1].="_c5";
+		$cameraDetected=1;
+	}
+	elsif($cameraProd eq "Sony" && $cameraModel eq "G8441") {
+        # sony xperia xz1 compact - assume it's mine
+		$_[1].="_c6";
 		$cameraDetected=1;
 	}
 	elsif($cameraModel eq "FinePix S5600") {
