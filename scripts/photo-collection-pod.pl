@@ -20,13 +20,13 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion = "2018-12-10-0";
+$gVersion = "2022-11-10-0";
 $gDebug = 0;
 $gHeavyDebug = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
-$gImageFnameRegexp="\.(jpe?g|tiff?|png)\$";
+$gImageFnameRegexp="\.(jpe?g|tiff?|png|webp)\$";
 
 @gConfigCmds = ();
 
