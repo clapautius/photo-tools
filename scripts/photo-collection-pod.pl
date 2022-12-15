@@ -20,9 +20,10 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion = "2022-11-10-0";
+$gVersion = "2022-12-15-0";
 $gDebug = 0;
 $gHeavyDebug = 0;
+$gPrintList = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
@@ -191,10 +192,11 @@ span.author { font-weight: bold; }
 
 sub displayUsage {
 	print "photo-collection-pod.pl ver. $gVersion\n";
-	print "usage: photo-collection-pod.pl [ -t ] [ -c <collectionPath> ] [ -d <destination> ] [ -v ] [ -m <max_width>x<max_height> ]\n";
+	print "usage: photo-collection-pod.pl [ -t ] [ -c <collectionPath> ] [ -d <destination> ] [ -v ] [ -m <max_width>x<max_height> ] [ -l ]\n";
 	print "  -v : verbose on\n";
     print "  -t : run tests\n";
     print "  -m : max dimensions (e.g. 500x500)\n";
+    print "  -l : print image list (without probabilities)\n";
 }
 
 
@@ -316,10 +318,14 @@ sub executeConfigCmds {
 
 
 sub processFile {
-	debugHeavyMsg("Analyzing file / dir $File::Find::name"); # :debug:
-	if (isImageFile($File::Find::name)) {
+    debugHeavyMsg("Analyzing file / dir $File::Find::name"); # :debug:
+    if ($File::Find::dir =~ m"/front-page/") {
+        debugMsg("Ignoring 'front-page' dir for path $File::Find::name");
+        return;
+    }
+    if (isImageFile($File::Find::name)) {
         $imgPath = $File::Find::name;
-		debugMsg("Analyzing image file $File::Find::name");
+        debugMsg("Analyzing image file $File::Find::name");
         ($fpath, $fname, $fext) = fpathSplit($imgPath);
 
         # check if not already present
@@ -427,22 +433,23 @@ sub runTests {
 # returns the image filename (e.g. photo.jpg)
 # to obtain the xml filename, use fpathReplaceExtension()
 sub selectAFile {
-	find({ wanted => \&processFile, follow => 1, no_chdir => 1 } , ( $_[0] ) );
-	debugMsg("No. of files in list: ".($#gImgFileList+1));
+    find({ wanted => \&processFile, follow => 1, no_chdir => 1 } , ( $_[0] ) );
+    debugMsg("No. of files in list: ".($#gImgFileList+1));
 
-	# :debug:
-	#for ($i=0; $i<=$#gImgFileList; $i++) {
-	#	debugMsg($gImgFileList[$i]);
-	#}
+    if ($gPrintList) {
+        for ($i=0; $i<=$#gImgFileList; $i++) {
+            print ":list: $gImgFileList[$i]\n";
+	}
+    }
 
-	if ($#gImgFileList > 0) {
-		my $selectedDirNum=int(rand($#gImgFileList+1));
-		debugMsg("Selected image no. $selectedDirNum from list; filename=$gImgFileList[$selectedDirNum]");
-		return $gImgFileList[$selectedDirNum];
-	}
-	else {
-		return 0;
-	}
+    if ($#gImgFileList > 0) {
+        my $selectedDirNum=int(rand($#gImgFileList+1));
+        debugMsg("Selected image no. $selectedDirNum from list; filename=$gImgFileList[$selectedDirNum]");
+        return $gImgFileList[$selectedDirNum];
+    }
+    else {
+        return 0;
+    }
 }
 
 # main
@@ -501,6 +508,10 @@ while(scalar @ARGV > 0) {
 	}
 	elsif($ARGV[0] eq "-v") {
 		$gDebug=1;
+		shift(@ARGV);
+	}
+	elsif($ARGV[0] eq "-l") {
+		$gPrintList = 1;
 		shift(@ARGV);
 	}
 	else {
