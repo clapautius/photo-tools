@@ -20,10 +20,11 @@ use XML::XPath;
 use XML::XPath::XMLParser;
 use File::Find;
 
-$gVersion = "2022-12-15-0";
+$gVersion = "2022-12-15-1";
 $gDebug = 0;
 $gHeavyDebug = 0;
 $gPrintList = 0;
+$gPrintListProb = 0;
 $gPhotoCollectionPath = $ENV{'HOME'} . "/var/alternatives/colectie-foto";
 $gPodPath = $ENV{'HOME'} . "/var/run/pod/";
 $gFlagsDir = $ENV{'HOME'} . "/var/settings/colectie-foto-flags";
@@ -337,8 +338,8 @@ sub processFile {
         }
         push(@gImgFileOnlyList, $fname);
 
-		my $flagFile;
-		my $probability=3;
+        my $flagFile;
+        my $probability=3;
 
         # read data from xml (if available)
         my $xmlFile = fpathReplaceExtension($imgPath, "xml");
@@ -352,14 +353,14 @@ sub processFile {
         } elsif (getXmlData($xmlFile, $filename, $author, $source, $title, $tags)<=0) {
             print STDERR "Error parsing XML file $fileToLoad.\n";
 			exit(3);
-		}
+        }
 
         $probability = executeConfigCmds($imgPath, $tags, $probability);
 
-		for ($i=0; $i<$probability; $i++) {
-			push(@gImgFileList, $File::Find::name);
-		}
-	}
+        for ($i=0; $i<$probability; $i++) {
+            push(@gImgFileList, $File::Find::name);
+        }
+    }
 }
 
 
@@ -434,11 +435,18 @@ sub runTests {
 # to obtain the xml filename, use fpathReplaceExtension()
 sub selectAFile {
     find({ wanted => \&processFile, follow => 1, no_chdir => 1 } , ( $_[0] ) );
+    debugMsg("No. of unique images in list: ".($#gImgFileOnlyList+1));
     debugMsg("No. of files in list: ".($#gImgFileList+1));
 
     if ($gPrintList) {
+        for ($i=0; $i<=$#gImgFileOnlyList; $i++) {
+            print ":list: $gImgFileOnlyList[$i]\n";
+	}
+    }
+
+    if ($gPrintListProb) {
         for ($i=0; $i<=$#gImgFileList; $i++) {
-            print ":list: $gImgFileList[$i]\n";
+            print ":list-prob: $gImgFileList[$i]\n";
 	}
     }
 
@@ -512,6 +520,10 @@ while(scalar @ARGV > 0) {
 	}
 	elsif($ARGV[0] eq "-l") {
 		$gPrintList = 1;
+		shift(@ARGV);
+	}
+	elsif($ARGV[0] eq "-L") {
+		$gPrintListProb = 1;
 		shift(@ARGV);
 	}
 	else {
